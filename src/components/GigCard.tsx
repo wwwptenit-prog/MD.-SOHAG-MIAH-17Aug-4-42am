@@ -160,13 +160,11 @@ export const GigCard: React.FC<GigCardProps> = ({
                 <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 rounded-full ring-1 ring-white dark:ring-slate-900 animate-pulse" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-1">
                   <span className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate group-hover:text-[#1DB954] transition-colors">
                     {gig.sellerName}
                   </span>
-                  {isAgency && (
-                    <ShieldCheck className="w-3 h-3 sm:w-4 sm:h-4 text-[#1DB954] shrink-0" title="PTENit Official Agency" />
-                  )}
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                 </div>
                 <span className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400 block truncate font-medium">
                   {gig.sellerLevel || 'Top Rated'}

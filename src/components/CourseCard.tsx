@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, BookOpen, Users, Star, ArrowRight, Tag } from 'lucide-react';
+import { Clock, BookOpen, Users, Star, ArrowRight, Tag, CheckCircle2 } from 'lucide-react';
 import { Course } from '../types';
 import { useData } from '../context/DataContext';
 
@@ -67,7 +67,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           </h3>
 
           <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold font-bengali truncate">
-            {t('ইন্সট্রাক্টর:', 'Instructor:')} <span className="text-slate-700 dark:text-slate-200">{course.instructor}</span>
+            {t('ইন্সট্রাক্টর:', 'Instructor:')} <span className="text-slate-700 dark:text-slate-200 font-bold flex items-center gap-1"><span className="truncate">{course.instructor}</span><CheckCircle2 className="w-3 h-3 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড ইনস্ট্রাক্টর" /></span>
           </p>
         </div>
 

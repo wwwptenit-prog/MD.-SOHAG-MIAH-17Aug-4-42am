@@ -186,6 +186,12 @@ interface DataContextType {
   markMessageRead: (id: string) => void;
   
   // Notifications
+  isNotificationCenterOpen: boolean;
+  setIsNotificationCenterOpen: (open: boolean) => void;
+  openNotificationCenter: () => void;
+  closeNotificationCenter: () => void;
+  clearAllNotifications: () => void;
+  deleteNotification: (id: string) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   sendCentralNotification: (notif: Omit<NotificationItem, 'id' | 'time' | 'read'>) => void;
@@ -1593,12 +1599,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setActiveMessengerConversationId(null);
     }
+    setIsNotificationCenterOpen(false);
     setIsMessengerInboxOpen(true);
   };
 
   const closeMessengerInbox = () => {
     setActiveMessengerConversationId(null);
     setIsMessengerInboxOpen(false);
+    setIsNotificationCenterOpen(false);
+  };
+
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false);
+
+  const openNotificationCenter = () => {
+    setIsMessengerInboxOpen(false);
+    setIsNotificationCenterOpen(true);
+  };
+
+  const closeNotificationCenter = () => {
+    setIsNotificationCenterOpen(false);
+    setIsMessengerInboxOpen(false);
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  const deleteNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   const toggleMinimizeChatWindow = (id: string) => {
@@ -2337,6 +2365,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsMessengerInboxOpen,
         openMessengerInbox,
         closeMessengerInbox,
+        isNotificationCenterOpen,
+        setIsNotificationCenterOpen,
+        openNotificationCenter,
+        closeNotificationCenter,
+        clearAllNotifications,
+        deleteNotification,
         assignments,
         submissions,
         customerProjects,

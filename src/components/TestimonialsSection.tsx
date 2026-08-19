@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, Quote, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 export const TestimonialsSection: React.FC = () => {
@@ -77,8 +77,9 @@ export const TestimonialsSection: React.FC = () => {
                         className="w-10 h-10 rounded-full object-cover border-2 border-[#1DB954] shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-bold text-sm text-slate-900 dark:text-white font-bengali truncate">
-                          {item.name}
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white font-bengali truncate flex items-center gap-1">
+                          <span className="truncate">{item.name}</span>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                         </h4>
                         <p className="text-[11px] text-slate-500 font-bengali truncate">
                           {item.role} • <span className="text-[#1DB954] font-semibold">{item.courseOrService}</span>
@@ -158,8 +159,9 @@ export const TestimonialsSection: React.FC = () => {
                   className="w-12 h-12 rounded-full object-cover border-2 border-[#1DB954]"
                 />
                 <div>
-                  <h4 className="font-bold text-base text-slate-900 dark:text-white font-bengali">
-                    {item.name}
+                  <h4 className="font-bold text-base text-slate-900 dark:text-white font-bengali flex items-center gap-1">
+                    <span>{item.name}</span>
+                    <CheckCircle2 className="w-4 h-4 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                   </h4>
                   <p className="text-xs text-slate-500 font-bengali">
                     {item.role} • <span className="text-[#1DB954] font-semibold">{item.courseOrService}</span>

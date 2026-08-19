@@ -24,6 +24,7 @@ import { TeacherDashboard } from './components/TeacherDashboard';
 import { CustomerDashboard } from './components/CustomerDashboard';
 import { MarketplaceSection } from './components/MarketplaceSection';
 import { FloatingMessengerWindows } from './components/FloatingMessengerWindows';
+import { NotificationCenterModal } from './components/NotificationCenterModal';
 import { Course } from './types';
 
 const MainAppContent: React.FC = () => {
@@ -315,6 +316,9 @@ const MainAppContent: React.FC = () => {
 
       {/* Facebook-style Messenger Floating Chat Windows */}
       <FloatingMessengerWindows />
+
+      {/* Central Mobile & Desktop Notification Center Modal */}
+      <NotificationCenterModal onNavigateTab={setActiveTab} />
 
     </div>
   );

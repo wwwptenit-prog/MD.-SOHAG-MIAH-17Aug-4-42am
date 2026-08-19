@@ -78,23 +78,25 @@ export const Hero: React.FC<HeroProps> = ({ setActiveTab }) => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.4 }}
-              className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-slate-800/80 max-w-xl mx-auto lg:mx-0 text-left"
+              className="pt-4 border-t border-slate-800/80 max-w-md lg:max-w-xl mx-auto lg:mx-0"
             >
-              <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[#1DB954] shrink-0" />
-                <span className="text-xs font-bold text-slate-300 font-bengali truncate">AI সাপোর্ট</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#1DB954] shrink-0" />
-                <span className="text-xs font-bold text-slate-300 font-bengali truncate">{t('বিশ্বস্ত ট্রেনিং', 'Trusted')}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-[#1DB954] shrink-0" />
-                <span className="text-xs font-bold text-slate-300 font-bengali truncate">{t('সার্টিফিকেট', 'Certificate')}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-[#1DB954] shrink-0" />
-                <span className="text-xs font-bold text-slate-300 font-bengali truncate">{t('লাইফটাইম সাপোর্ট', 'Support')}</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className="flex items-center gap-2 justify-start pl-2 sm:pl-0">
+                  <Sparkles className="w-5 h-5 text-[#1DB954] shrink-0 stroke-[2.2]" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 font-bengali truncate">AI সাপোর্ট</span>
+                </div>
+                <div className="flex items-center gap-2 justify-start pl-2 sm:pl-0">
+                  <Award className="w-5 h-5 text-[#1DB954] shrink-0 stroke-[2.2]" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 font-bengali truncate">{t('সার্টিফিকেট', 'Certificate')}</span>
+                </div>
+                <div className="flex items-center gap-2 justify-start pl-2 sm:pl-0">
+                  <ShieldCheck className="w-5 h-5 text-[#1DB954] shrink-0 stroke-[2.2]" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 font-bengali truncate">{t('বিশ্বস্ত ট্রেনিং', 'Trusted')}</span>
+                </div>
+                <div className="flex items-center gap-2 justify-start pl-2 sm:pl-0">
+                  <Users className="w-5 h-5 text-[#1DB954] shrink-0 stroke-[2.2]" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 font-bengali truncate">{t('লাইফটাইম সাপোর্ট', 'Support')}</span>
+                </div>
               </div>
             </motion.div>
           </div>

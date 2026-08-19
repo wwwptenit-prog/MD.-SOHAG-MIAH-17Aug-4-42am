@@ -37,7 +37,18 @@ import {
   Mail,
   Bell,
   Heart,
-  PhoneCall
+  PhoneCall,
+  Trash2,
+  AlertTriangle,
+  Info,
+  CreditCard,
+  ArrowRight,
+  Play,
+  Award,
+  Download,
+  HelpCircle,
+  CheckCircle,
+  MessageSquare
 } from 'lucide-react';
 
 interface ConversationItem {
@@ -69,13 +80,29 @@ export const FloatingMessengerWindows: React.FC = () => {
     isMessengerInboxOpen,
     closeMessengerInbox,
     activeMessengerConversationId,
-    setActiveMessengerConversationId
+    setActiveMessengerConversationId,
+    openNotificationCenter,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    deleteNotification,
+    playAppSound,
+    isNotificationCenterOpen,
+    closeNotificationCenter
   } = useData();
 
   // Full Screen Messenger State
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+  const [activeTopTab, setActiveTopTab] = useState<'messages' | 'notifications' | 'courses'>('messages');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedNotification, setSelectedNotification] = useState<any | null>(null);
+  const [activeCourseFeatureModal, setActiveCourseFeatureModal] = useState<{
+    courseTitle: string;
+    featureType: 'video' | 'certificate' | 'source_code' | 'live_class' | 'quiz' | 'qna';
+    featureTitle: string;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'sellers' | 'online' | 'orders'>('all');
   
   // Interactive Modals
@@ -100,7 +127,15 @@ export const FloatingMessengerWindows: React.FC = () => {
     readReceipts: true
   });
 
-  const isOpen = isMessengerInboxOpen || isFullScreenOpen;
+  const isOpen = isMessengerInboxOpen || isFullScreenOpen || isNotificationCenterOpen;
+
+  useEffect(() => {
+    if (isNotificationCenterOpen) {
+      setActiveTopTab('notifications');
+    } else if (isMessengerInboxOpen) {
+      setActiveTopTab('messages');
+    }
+  }, [isNotificationCenterOpen, isMessengerInboxOpen]);
 
   // Synchronize selected conversation ID whenever messenger opens or activeMessengerConversationId changes
   useEffect(() => {
@@ -112,6 +147,7 @@ export const FloatingMessengerWindows: React.FC = () => {
     setSelectedConversationId(null);
     if (setActiveMessengerConversationId) setActiveMessengerConversationId(null);
     closeMessengerInbox();
+    if (isNotificationCenterOpen) closeNotificationCenter();
   };
 
   // Call timer interval
@@ -248,17 +284,26 @@ export const FloatingMessengerWindows: React.FC = () => {
     }
   });
 
-  const conversationList = Array.from(allConversationsMap.values()).filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.role.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (!matchesSearch) return false;
-    if (activeCategoryFilter === 'sellers') return c.category === 'sellers';
-    if (activeCategoryFilter === 'online') return c.isOnline;
-    if (activeCategoryFilter === 'orders') return c.category === 'orders' || c.name.includes('Official');
-    return true;
-  });
+  const conversationList = Array.from(allConversationsMap.values())
+    .filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.role.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      if (activeCategoryFilter === 'sellers') return c.category === 'sellers';
+      if (activeCategoryFilter === 'online') return c.isOnline;
+      if (activeCategoryFilter === 'orders') return c.category === 'orders' || c.name.includes('Official');
+      return true;
+    })
+    .sort((a, b) => {
+      const unreadA = a.unreadCount || 0;
+      const unreadB = b.unreadCount || 0;
+      if (unreadA > 0 && unreadB === 0) return -1;
+      if (unreadB > 0 && unreadA === 0) return 1;
+      if (unreadA !== unreadB) return unreadB - unreadA;
+      return 0;
+    });
 
   // Top seller stories / online status cards
   const topSellers = [
@@ -325,6 +370,45 @@ export const FloatingMessengerWindows: React.FC = () => {
     } : null
   );
 
+  const getNotificationTypeIcon = (n: any) => {
+    if (!n) return null;
+    if (n.type === 'success' || n.category === 'payment' || (n.title && (n.title.includes('৳') || n.title.includes('ওয়ালেট')))) {
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-[#1DB954] shrink-0 shadow-xs">
+          <ShieldCheck className="w-5 h-5" />
+        </div>
+      );
+    }
+    if (n.type === 'warning' || n.type === 'alert') {
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-xs">
+          <AlertTriangle className="w-5 h-5" />
+        </div>
+      );
+    }
+    if (n.category === 'mentor' || n.targetTab === 'student-dashboard' || (n.title && n.title.includes('কোর্স'))) {
+      return (
+        <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 shadow-xs">
+          <BookOpen className="w-5 h-5" />
+        </div>
+      );
+    }
+    if (n.senderAvatar) {
+      return (
+        <img
+          src={n.senderAvatar}
+          alt=""
+          className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+        />
+      );
+    }
+    return (
+      <div className="w-10 h-10 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-[#0084FF] shrink-0 shadow-xs">
+        <Sparkles className="w-5 h-5" />
+      </div>
+    );
+  };
+
   return (
     <>
       {/* 1. FLOATING MINI CHAT HEADS & BOTTOM WINDOWS (ONLY ON DESKTOP - NEVER ON PHONE VIEW) */}
@@ -363,7 +447,7 @@ export const FloatingMessengerWindows: React.FC = () => {
                 className="flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer text-white"
                 title="হোম"
               >
-                <Globe className="w-5 h-5 text-white" />
+                <Home className="w-5 h-5 text-white" />
               </button>
               {/* 2. Order */}
               <button
@@ -377,28 +461,48 @@ export const FloatingMessengerWindows: React.FC = () => {
               {/* 3. Course */}
               <button
                 type="button"
-                onClick={handleCloseAll}
-                className="flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer text-white"
-                title="আমার কোর্সসমূহ"
+                onClick={() => {
+                  setActiveTopTab('courses');
+                  setSelectedConversationId(null);
+                  setSelectedNotification(null);
+                }}
+                className={`flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer ${
+                  activeTopTab === 'courses' ? 'text-[#1DB954]' : 'text-white hover:text-emerald-400'
+                }`}
+                title="আমার কোর্সসমূহ ও ফিচারস"
               >
-                <BookOpen className="w-5 h-5 text-white" />
+                <BookOpen className={`w-5 h-5 ${activeTopTab === 'courses' ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
               </button>
-              {/* 4. Messenger (Active) */}
+              {/* 4. Messenger */}
               <button
                 type="button"
-                className="flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer text-[#1DB954]"
-                title="মেসেঞ্জার"
+                onClick={() => {
+                  setActiveTopTab('messages');
+                  if (isNotificationCenterOpen) closeNotificationCenter();
+                }}
+                className={`flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer ${
+                  activeTopTab === 'messages' ? 'text-[#1DB954]' : 'text-white hover:text-emerald-400'
+                }`}
+                title="মেসেঞ্জার ও ইনবক্স"
               >
-                <Mail className="w-5 h-5 stroke-[2.5] text-[#1DB954]" />
+                <Mail className={`w-5 h-5 ${activeTopTab === 'messages' ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
               </button>
               {/* 5. Notification */}
               <button
                 type="button"
-                onClick={handleCloseAll}
-                className="flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer text-white"
-                title="নোটিফিকেশন"
+                onClick={() => {
+                  setActiveTopTab('notifications');
+                  setSelectedConversationId(null);
+                }}
+                className={`flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer ${
+                  activeTopTab === 'notifications' ? 'text-[#1DB954]' : 'text-white hover:text-emerald-400'
+                }`}
+                title="নোটিফিকেশন সেন্টার"
               >
-                <Bell className="w-5 h-5 text-white" />
+                <Bell className={`w-5 h-5 ${activeTopTab === 'notifications' ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-0 right-2 w-2 h-2 rounded-full bg-[#1DB954] ring-2 ring-[#0B132B]" />
+                )}
               </button>
               {/* 6. Saved / Favorites */}
               <button
@@ -421,6 +525,9 @@ export const FloatingMessengerWindows: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setSelectedConversationId(null);
+                        setIsMobileSearchActive(false);
+                        setSearchQuery('');
+                        setActiveCategoryFilter('all');
                         if (setActiveMessengerConversationId) setActiveMessengerConversationId(null);
                       }}
                       className="p-1 -ml-1 rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition cursor-pointer shrink-0"
@@ -428,11 +535,11 @@ export const FloatingMessengerWindows: React.FC = () => {
                     >
                       <ChevronLeft className="w-5 h-5 text-slate-100" />
                     </button>
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0 p-[2px] rounded-full bg-gradient-to-tr from-emerald-400 via-blue-500 to-cyan-400 shadow-xs">
                       <img
                         src={currentActiveWin.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
                         alt={currentActiveWin.senderName}
-                        className="w-8 h-8 rounded-full object-cover border border-slate-700/80 shadow-2xs"
+                        className="w-8 h-8 rounded-full object-cover border border-[#0B132B]"
                       />
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#1DB954] border-2 border-[#0B132B]" />
                     </div>
@@ -441,11 +548,10 @@ export const FloatingMessengerWindows: React.FC = () => {
                         <h2 className="text-xs sm:text-sm font-black text-white tracking-tight leading-tight truncate">
                           {currentActiveWin.senderName}
                         </h2>
-                        <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0 fill-blue-400/20" />
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                       </div>
-                      <p className="text-[10px] text-[#1DB954] font-bold leading-none mt-0.5 truncate flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] shrink-0" />
-                        <span>Active now (অনলাইনে আছেন)</span>
+                      <p className="text-[10px] text-[#1DB954] font-bold leading-none mt-0.5 truncate">
+                        Active now
                       </p>
                     </div>
                   </div>
@@ -469,6 +575,153 @@ export const FloatingMessengerWindows: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              ) : isMobileSearchActive ? (
+                /* Inline Search Input inside Top Sub-Header */
+                <div className="flex items-center gap-2 animate-in fade-in duration-150 py-0.5">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="সেলার, বায়ার বা সার্ভিস খুঁজুন..."
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1 bg-slate-900/90 text-white placeholder-slate-400 border border-slate-700/80 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileSearchActive(false);
+                      setSearchQuery('');
+                    }}
+                    className="px-2 py-1 rounded-lg text-slate-300 hover:text-white text-xs font-bold cursor-pointer shrink-0"
+                  >
+                    বাতিল
+                  </button>
+                </div>
+              ) : activeTopTab === 'courses' ? (
+                /* List View Sub-Header for Courses: Courses & Academy Features • PTENit */
+                <div className="flex items-center justify-between py-0.5 font-bengali">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCloseAll}
+                      className="p-1 -ml-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                      title="হোমে ফিরে যান"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-slate-200" />
+                    </button>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h2 className="text-sm font-black text-white tracking-tight leading-none">আমার কোর্সসমূহ ও ফিচারস</h2>
+                        <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">
+                        PTENit Academy & Learning Features
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileSearchActive(true)}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                      title="কোর্স খুঁজুন"
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : activeTopTab === 'notifications' ? (
+                selectedNotification ? (
+                  /* Notification Detail View Header (Replaces Notifications • PTENit Marketplace Updates) */
+                  <div className="flex items-center justify-between py-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedNotification(null)}
+                      className="flex items-center gap-1 text-slate-200 hover:text-white transition cursor-pointer active:scale-95 py-1 -ml-1"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-[#1DB954] stroke-[2.5]" />
+                      <span className="text-xs font-black">ফিরে যান</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteNotification(selectedNotification.id);
+                          setSelectedNotification(null);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
+                        title="নোটিফিকেশন মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* List View Sub-Header for Notifications: Notifications • PTENit Marketplace Updates */
+                  <div className="flex items-center justify-between py-0.5">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCloseAll}
+                        className="p-1 -ml-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        title="হোমে ফিরে যান"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-slate-200" />
+                      </button>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h2 className="text-sm font-black text-white tracking-tight leading-none">Notifications</h2>
+                          <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
+                          {notifications.filter(n => !n.read).length > 0 && (
+                            <span className="bg-[#1DB954] text-white text-[10px] font-black rounded-full px-1.5 py-0.2 shrink-0">
+                              {notifications.filter(n => !n.read).length}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">
+                          PTENit Marketplace Updates
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right: Search + Mark All Read */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsMobileSearchActive(true)}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        title="সার্চ করুন"
+                      >
+                        <Search className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          markAllNotificationsRead();
+                          if (playAppSound) playAppSound('notification');
+                        }}
+                        className="p-1.5 rounded-lg text-[#1DB954] hover:text-emerald-300 hover:bg-slate-800 transition cursor-pointer"
+                        title="সব পড়া চিহ্নিত করুন"
+                      >
+                        <CheckCheck className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )
               ) : (
                 /* List View Sub-Header: Messages • PiTen Marketplace Inbox */
                 <div className="flex items-center justify-between py-0.5">
@@ -477,7 +730,7 @@ export const FloatingMessengerWindows: React.FC = () => {
                       type="button"
                       onClick={handleCloseAll}
                       className="p-1 -ml-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                      title="ফিরে যান"
+                      title="হোমে ফিরে যান"
                     >
                       <ChevronLeft className="w-5 h-5 text-slate-200" />
                     </button>
@@ -486,8 +739,30 @@ export const FloatingMessengerWindows: React.FC = () => {
                         <h2 className="text-sm font-black text-white tracking-tight leading-none">Messages</h2>
                         <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold leading-tight mt-0.5">PiTen Marketplace Inbox</p>
+                      <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">
+                        PTENit Marketplace Inbox
+                      </p>
                     </div>
+                  </div>
+
+                  {/* Right: Search + Settings */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileSearchActive(true)}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                      title="সার্চ করুন"
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingsModalOpen(true)}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                      title="সেটিংস"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
@@ -502,7 +777,7 @@ export const FloatingMessengerWindows: React.FC = () => {
             }`}>
               
               {/* MESSAGES HEADER: Clean & Professional, Search + Settings set together on the right */}
-              <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 shrink-0">
+              <div className="hidden md:flex px-4 py-3 items-center justify-between border-b border-slate-100 dark:border-slate-800/80 shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -514,11 +789,11 @@ export const FloatingMessengerWindows: React.FC = () => {
                   </button>
                   <div>
                     <h1 className="text-lg sm:text-xl font-black text-slate-950 dark:text-white tracking-tight flex items-center gap-1.5">
-                      <span>Messages</span>
+                      <span>{activeTopTab === 'notifications' ? 'Notifications' : 'Messages'}</span>
                       <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
                     </h1>
-                    <p className="text-[10px] font-bold text-slate-400">
-                      PiTen Marketplace Inbox
+                    <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">
+                      {activeTopTab === 'notifications' ? 'PTENit Marketplace Updates' : 'PTENit Marketplace Inbox'}
                     </p>
                   </div>
                 </div>
@@ -552,8 +827,8 @@ export const FloatingMessengerWindows: React.FC = () => {
               {/* SCROLLABLE BODY: SEARCH BAR, FILTER TABS, SELLERS CAROUSEL & CONVERSATION LIST ALL SCROLL TOGETHER */}
               <div className="flex-1 overflow-y-auto no-scrollbar divide-y divide-slate-100/80 dark:divide-slate-800/40">
                 
-                {/* SEARCH BAR & FILTER TABS (SCROLLS SMOOTHLY ON PHONE) */}
-                <div className="p-3 space-y-2.5">
+                {/* SEARCH BAR & FILTER TABS (HIDDEN ON PHONE VIEW) */}
+                <div className="hidden md:block p-3 space-y-2.5">
                   <div className="relative">
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
@@ -575,8 +850,8 @@ export const FloatingMessengerWindows: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Filter Pills */}
-                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px] font-bold">
+                  {/* Filter Pills (Hidden on Phone View) */}
+                  <div className="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px] font-bold">
                     <button
                       type="button"
                       onClick={() => setActiveCategoryFilter('all')}
@@ -625,55 +900,474 @@ export const FloatingMessengerWindows: React.FC = () => {
                   </div>
                 </div>
 
-                {/* TOP ACTIVE SELLERS & STATUS NOTES (CAROUSEL) */}
-                <div className="px-3 py-2.5 overflow-x-auto flex items-center gap-3.5 no-scrollbar">
-                  {topSellers.map(s => (
-                    <div
-                      key={s.id}
-                      onClick={() => {
-                        if (s.isMe) {
-                          setIsNoteModalOpen(true);
-                        } else if (s.convoId) {
-                          setSelectedConversationId(s.convoId);
-                          if (setActiveMessengerConversationId) setActiveMessengerConversationId(s.convoId);
-                          const win = activeChatWindows?.find(w => w.id === s.convoId);
-                          if (!win) {
-                            const convo = defaultHistory.find(d => d.id === s.convoId);
-                            if (convo) {
-                              openChatWindow({
-                                id: convo.id,
-                                senderName: convo.name,
-                                senderRole: convo.role,
-                                senderAvatar: convo.avatar
-                              });
-                            }
-                          }
-                        }
-                      }}
-                      className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
-                    >
-                      <div className="relative">
-                        {s.isMe && (
-                          <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-50 dark:bg-slate-800 border border-[#0084FF]/40 shadow-xs px-2 py-0.5 rounded-full text-[9px] font-bold text-[#0084FF] dark:text-sky-300 whitespace-nowrap z-10">
-                            {userNote.length > 12 ? userNote.substring(0, 12) + '...' : userNote}
-                          </span>
-                        )}
-                        <img
-                          src={s.avatar}
-                          alt={s.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-slate-700 group-hover:scale-105 transition-transform"
-                        />
-                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#18222D]" />
-                      </div>
-                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 max-w-[62px] truncate text-center">
-                        {s.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
 
-                {/* CONVERSATION HISTORY LIST (PROFESSIONAL MARKETPLACE PROFILES) */}
-                <div className="divide-y divide-slate-100/80 dark:divide-slate-800/40">
+
+                {/* CONVERSATION, COURSES OR NOTIFICATION HISTORY LIST / DETAIL */}
+                {activeTopTab === 'courses' ? (
+                  /* COURSES & ACADEMY FEATURE SUITE (PHONE & DESKTOP VIEW) */
+                  <div className="p-3 sm:p-5 space-y-4 w-full font-bengali overflow-y-auto max-h-[85vh] md:max-h-full">
+                    {/* Course Stats Bar */}
+                    <div className="grid grid-cols-3 gap-2 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl text-center shadow-lg">
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/50">
+                        <p className="text-[10px] text-slate-400 font-bold">এনরোল্ড কোর্স</p>
+                        <p className="text-base font-black text-[#1DB954] mt-0.5">৩ টি</p>
+                      </div>
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/50">
+                        <p className="text-[10px] text-slate-400 font-bold">লার্নিং সময়</p>
+                        <p className="text-base font-black text-sky-400 mt-0.5">৪৬ ঘণ্টা</p>
+                      </div>
+                      <div className="p-2 bg-slate-800/80 rounded-xl border border-slate-700/50">
+                        <p className="text-[10px] text-slate-400 font-bold">সার্টিফিকেট</p>
+                        <p className="text-base font-black text-amber-400 mt-0.5">২ টি অর্জন</p>
+                      </div>
+                    </div>
+
+                    {/* Interactive Feature Modal Popup (when clicked) */}
+                    {activeCourseFeatureModal && (
+                      <div className="p-4 rounded-2xl bg-slate-900 border-2 border-[#1DB954] shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                        <button
+                          type="button"
+                          onClick={() => setActiveCourseFeatureModal(null)}
+                          className="absolute top-3 right-3 p-1 rounded-full bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-2 mb-2 text-[#1DB954]">
+                          <Sparkles className="w-4 h-4" />
+                          <h4 className="text-xs font-black uppercase tracking-wider">{activeCourseFeatureModal.featureTitle}</h4>
+                        </div>
+                        <p className="text-xs text-white font-bold mb-3">{activeCourseFeatureModal.courseTitle}</p>
+
+                        {activeCourseFeatureModal.featureType === 'video' && (
+                          <div className="space-y-3">
+                            <div className="aspect-video w-full rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-4 text-center relative overflow-hidden">
+                              <div className="w-12 h-12 rounded-full bg-[#1DB954] text-slate-950 flex items-center justify-center shadow-lg mb-2">
+                                <Play className="w-6 h-6 fill-slate-950 ml-0.5" />
+                              </div>
+                              <p className="text-xs font-bold text-white">Lesson 17: Redux Toolkit State Management & RTK Query</p>
+                              <p className="text-[10px] text-slate-400 mt-1">Duration: 42 Minutes • HD 1080p Stream</p>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-300 pt-1">
+                              <span className="text-[11px] text-emerald-400 font-bold">✓ ১৬/২০ লেসন সম্পূর্ণ</span>
+                              <button onClick={() => alert('পরবর্তী ক্লাসে চলে যাওয়া হচ্ছে...')} className="px-3 py-1.5 bg-[#1DB954] text-slate-950 font-black rounded-lg text-xs hover:bg-emerald-400 transition cursor-pointer">
+                                পরবর্তী লেসন →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeCourseFeatureModal.featureType === 'certificate' && (
+                          <div className="space-y-3 text-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+                            <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-1 border border-amber-500/30">
+                              <Award className="w-6 h-6" />
+                            </div>
+                            <h5 className="text-xs font-black text-amber-300">PTENit Verified Digital Course Certificate</h5>
+                            <p className="text-[11px] text-slate-300">শিক্ষার্থী: সোহাগ কাজী (ভেরিফাইড আইডি: PTEN-CERT-8841)</p>
+                            <div className="pt-2 flex items-center justify-center gap-2">
+                              <button onClick={() => alert('সার্টিফিকেট PDF ডাউনলোড শুরু হয়েছে!')} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow">
+                                <Download className="w-4 h-4" />
+                                <span>PDF সার্টিফিকেট ডাউনলোড</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeCourseFeatureModal.featureType === 'source_code' && (
+                          <div className="space-y-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs">
+                            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-sky-400" />
+                                <span className="font-bold text-white text-[11px]">Complete Source Code (ZIP File)</span>
+                              </div>
+                              <button onClick={() => alert('সোর্স কোড জিপ ফাইল ডাউনলোড হচ্ছে...')} className="px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black rounded-md text-[10px] cursor-pointer">
+                                ডাউনলোড (48 MB)
+                              </button>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Globe className="w-4 h-4 text-[#1DB954]" />
+                                <span className="font-bold text-white text-[11px]">Official GitHub Repository</span>
+                              </div>
+                              <a href="https://github.com" target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold rounded-md text-[10px] cursor-pointer">
+                                গিটহাব লিংক ↗
+                              </a>
+                            </div>
+                          </div>
+                        )}
+
+                        {activeCourseFeatureModal.featureType === 'live_class' && (
+                          <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-center">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mx-auto">
+                              <Video className="w-5 h-5" />
+                            </div>
+                            <p className="text-xs font-bold text-white">লাইভ ডাউট ক্লিয়ারিং সেশন (Google Meet)</p>
+                            <p className="text-[11px] text-slate-400">সময়: আজ রাত ৯:০০ টা • ইন্সট্রাকটর: প্রকৌশলী আল-আমিন</p>
+                            <button onClick={() => createGoogleMeetCall('course-live')} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow">
+                              <Video className="w-4 h-4" />
+                              <span>সরাসরি লাইভ ক্লাসে জয়েন করুন</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {activeCourseFeatureModal.featureType === 'quiz' && (
+                          <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                            <p className="text-xs font-bold text-white">মডিউল কুইজ পরীক্ষা - মডিউল ৪ (Redux & Async Thunks)</p>
+                            <div className="p-2.5 bg-slate-900 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+                              <p className="font-semibold text-white mb-1.5">প্রশ্ন ১: RTK Query-তে `useQuery` হুক ব্যবহারের প্রধান সুবিধা কোনটি?</p>
+                              <div className="space-y-1">
+                                <label className="flex items-center gap-2 p-1.5 bg-slate-800/80 rounded cursor-pointer hover:bg-slate-700">
+                                  <input type="radio" name="quiz" className="accent-[#1DB954]" defaultChecked />
+                                  <span>অটোমেটিক ক্যাশিং ও রি-ফেচিং সুবিধা প্রদান করে</span>
+                                </label>
+                                <label className="flex items-center gap-2 p-1.5 bg-slate-800/80 rounded cursor-pointer hover:bg-slate-700">
+                                  <input type="radio" name="quiz" />
+                                  <span>শুধু লোকাল স্টোরেজ ডাটা সেভ করে</span>
+                                </label>
+                              </div>
+                            </div>
+                            <button onClick={() => alert('কুইজ উত্তর সাবমিট করা হয়েছে! স্কোর: ১০০%')} className="w-full py-2 bg-[#1DB954] hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl cursor-pointer">
+                              উত্তর জমা দিন
+                            </button>
+                          </div>
+                        )}
+
+                        {activeCourseFeatureModal.featureType === 'qna' && (
+                          <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                            <p className="text-xs font-bold text-white">ইন্সট্রাকটরের কাছে সরাসরি প্রশ্ন করুন</p>
+                            <textarea
+                              placeholder="আপনার সমস্যা বা প্রশ্ন বিস্তারিত লিখুন..."
+                              rows={2}
+                              className="w-full p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                            />
+                            <button onClick={() => alert('আপনার প্রশ্ন সফলভাবে সাবমিট হয়েছে। ইন্সট্রাকটর শীঘ্রই উত্তর দিবেন।')} className="w-full py-2 bg-[#1DB954] text-slate-950 font-black text-xs rounded-xl cursor-pointer">
+                              প্রশ্ন পাঠান
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Section Title */}
+                    <div className="flex items-center justify-between pt-1">
+                      <h3 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 text-[#1DB954]" />
+                        <span>এনরোল্ড কোর্সসমূহ ও এনাবেল্ড ফিচারস</span>
+                      </h3>
+                      <span className="text-[10px] text-slate-400 font-bold">লাইফটাইম অ্যাক্সেস</span>
+                    </div>
+
+                    {/* Course List Cards */}
+                    <div className="space-y-3">
+                      {[
+                        {
+                          id: 'course-mern-pro',
+                          title: 'Full-Stack MERN & Next.js Pro Web Development',
+                          instructor: 'প্রকৌশলী আল-আমিন',
+                          progress: 80,
+                          completedLessons: 16,
+                          totalLessons: 20,
+                          badge: 'MERN Pro',
+                          nextLessonTitle: 'Lesson 17: Redux Toolkit State Engine & RTK Query'
+                        },
+                        {
+                          id: 'course-python-ai',
+                          title: 'Python, Django & Artificial Intelligence Masterclass',
+                          instructor: 'Shahinur Rahman',
+                          progress: 45,
+                          completedLessons: 9,
+                          totalLessons: 20,
+                          badge: 'AI & Django',
+                          nextLessonTitle: 'Lesson 10: Building Custom Neural Networks'
+                        },
+                        {
+                          id: 'course-flutter-app',
+                          title: 'Mobile App Dev with React Native & Flutter',
+                          instructor: 'Zubair Hossain',
+                          progress: 20,
+                          completedLessons: 4,
+                          totalLessons: 20,
+                          badge: 'App Dev',
+                          nextLessonTitle: 'Lesson 5: Native Bridges & Camera API'
+                        }
+                      ].map((course) => (
+                        <div key={course.id} className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition shadow-md space-y-3">
+                          {/* Header */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="px-2 py-0.5 rounded-md bg-[#1DB954]/20 text-[#1DB954] text-[10px] font-black border border-[#1DB954]/30">
+                                  {course.badge}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">
+                                  {course.completedLessons}/{course.totalLessons} লেসন ({course.progress}%)
+                                </span>
+                              </div>
+                              <h4 className="text-xs sm:text-sm font-black text-white leading-tight">
+                                {course.title}
+                              </h4>
+                              <p className="text-[11px] text-slate-400 mt-1">
+                                ইনস্ট্রাকটর: <strong className="text-slate-200">{course.instructor}</strong>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div>
+                            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="bg-gradient-to-r from-[#1DB954] to-emerald-400 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${course.progress}%` }}
+                              />
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1 font-semibold truncate">
+                              পরবর্তী লেসন: {course.nextLessonTitle}
+                            </p>
+                          </div>
+
+                          {/* 6 Feature Buttons Grid (Same as Messenger Action Buttons) */}
+                          <div className="pt-1 border-t border-slate-800/80 grid grid-cols-3 gap-1.5">
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'video',
+                                featureTitle: '🎬 ক্লাস ভিডিও দেখা'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-[#1DB954]/20 hover:text-[#1DB954] text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <Play className="w-4 h-4 text-[#1DB954]" />
+                              <span className="text-[10px] font-black leading-none">ক্লাস ভিডিও</span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'certificate',
+                                featureTitle: '📜 ভেরিফাইড সার্টিফিকেট'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-amber-500/20 hover:text-amber-400 text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <Award className="w-4 h-4 text-amber-400" />
+                              <span className="text-[10px] font-black leading-none">সার্টিফিকেট</span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'source_code',
+                                featureTitle: '📂 সোর্স কোড ও নোটস'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-sky-500/20 hover:text-sky-400 text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <Download className="w-4 h-4 text-sky-400" />
+                              <span className="text-[10px] font-black leading-none">সোর্স কোড</span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'live_class',
+                                featureTitle: '🎥 লাইভ ডাউট সেশন'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-blue-500/20 hover:text-blue-400 text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <Video className="w-4 h-4 text-blue-400" />
+                              <span className="text-[10px] font-black leading-none">লাইভ ক্লাস</span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'quiz',
+                                featureTitle: '📝 কুইজ ও পরীক্ষা'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-purple-500/20 hover:text-purple-400 text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <HelpCircle className="w-4 h-4 text-purple-400" />
+                              <span className="text-[10px] font-black leading-none">মডিউল কুইজ</span>
+                            </button>
+
+                            <button
+                              onClick={() => setActiveCourseFeatureModal({
+                                courseTitle: course.title,
+                                featureType: 'qna',
+                                featureTitle: '💬 ইন্সট্রাকটর প্রশ্নাবলি'
+                              })}
+                              className="p-2 rounded-xl bg-slate-800/90 hover:bg-pink-500/20 hover:text-pink-400 text-slate-200 border border-slate-700/60 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                            >
+                              <MessageSquare className="w-4 h-4 text-pink-400" />
+                              <span className="text-[10px] font-black leading-none">প্রশ্ন করুন</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Browse Marketplace Courses Banner */}
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-[#1DB954]/40 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black text-white">নতুন কোর্স এক্সপ্লোর করুন</h4>
+                        <p className="text-[10px] text-slate-300 mt-0.5">মার্কেটপ্লেসের ১০০+ প্রিমিয়াম টিউটোরিয়াল ও কোর্স</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleCloseAll();
+                        }}
+                        className="px-3 py-2 bg-[#1DB954] hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs shrink-0 cursor-pointer transition shadow"
+                      >
+                        কোর্স ক্যাটালগ →
+                      </button>
+                    </div>
+                  </div>
+                ) : activeTopTab === 'notifications' ? (
+                  selectedNotification ? (
+                    /* NOTIFICATION DETAIL VIEW */
+                    <div className="p-4 sm:p-5 flex flex-col h-full bg-white dark:bg-[#18222D] animate-in fade-in duration-200 w-full overflow-y-auto">
+                      {/* Detail Card Content */}
+                      <div className="space-y-4 max-w-lg mx-auto w-full">
+                        <div className="flex items-start gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 shadow-xs">
+                          {getNotificationTypeIcon(selectedNotification)}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-tight">
+                              {selectedNotification.title}
+                            </h3>
+                            <p className="text-[11px] font-bold text-slate-400 mt-1">
+                              {selectedNotification.time}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-sans whitespace-pre-wrap">
+                          {selectedNotification.message}
+                        </div>
+
+                        {selectedNotification.details && (
+                          <div className="p-3.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-800/40 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                            {selectedNotification.details.badgeText && (
+                              <span className="inline-block px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-400 font-bold text-[10px] mb-1">
+                                {selectedNotification.details.badgeText}
+                              </span>
+                            )}
+                            {selectedNotification.details.note && (
+                              <p className="font-semibold">{selectedNotification.details.note}</p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="pt-2 flex items-center gap-3">
+                          {(selectedNotification.targetTab === 'messenger' || selectedNotification.category === 'message' || selectedNotification.targetId) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedNotification.targetId) {
+                                  setSelectedConversationId(selectedNotification.targetId);
+                                  if (setActiveMessengerConversationId) setActiveMessengerConversationId(selectedNotification.targetId);
+                                }
+                                setActiveTopTab('messages');
+                                setSelectedNotification(null);
+                              }}
+                              className="flex-1 py-2.5 bg-[#1DB954] hover:bg-emerald-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-xs cursor-pointer active:scale-95"
+                            >
+                              <span>সরাসরি ইনবক্সে কথা বলুন</span>
+                              <Mail className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedNotification(null);
+                                handleCloseAll();
+                              }}
+                              className="flex-1 py-2.5 bg-[#0084FF] hover:bg-blue-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-xs cursor-pointer active:scale-95"
+                            >
+                              <span>{selectedNotification.actionLabel || 'ড্যাশবোর্ড / সেকশন ওপেন করুন'}</span>
+                              <ExternalLink className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteNotification(selectedNotification.id);
+                              setSelectedNotification(null);
+                            }}
+                            className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-bold text-xs transition cursor-pointer"
+                            title="নোটিফিকেশন মুছুন"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* NOTIFICATION LIST VIEW */
+                    <div className="divide-y divide-slate-100/80 dark:divide-slate-800/40 w-full">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-400 text-xs font-bold">
+                          কোনো নোটিফিকেশন পাওয়া যায়নি।
+                        </div>
+                      ) : (
+                        notifications
+                          .filter(n => {
+                            if (!searchQuery) return true;
+                            return n.title.toLowerCase().includes(searchQuery.toLowerCase()) || n.message.toLowerCase().includes(searchQuery.toLowerCase());
+                          })
+                          .sort((a, b) => {
+                            if (!a.read && b.read) return -1;
+                            if (a.read && !b.read) return 1;
+                            return 0;
+                          })
+                          .map(n => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                markNotificationRead(n.id);
+                                setSelectedNotification(n);
+                              }}
+                              className={`p-3 sm:px-4 sm:py-3.5 flex items-center gap-3 cursor-pointer transition-colors w-full ${
+                                !n.read
+                                  ? 'bg-blue-50/90 dark:bg-slate-800/90 font-semibold'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 opacity-85'
+                              }`}
+                            >
+                              {/* Google Material Icon Badge */}
+                              <div className="relative shrink-0">
+                                {getNotificationTypeIcon(n)}
+                                {!n.read && (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#1DB954] rounded-full border-2 border-white dark:border-[#18222D] shadow-xs" />
+                                )}
+                              </div>
+
+                              {/* Title, Time & Snippet */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <h4 className={`text-xs sm:text-sm font-black truncate ${!n.read ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    {n.title}
+                                  </h4>
+                                  <span className="text-[10px] text-slate-400 font-bold shrink-0 ml-1">
+                                    {n.time}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 truncate font-medium flex-1 mr-2">
+                                    {n.message}
+                                  </p>
+                                  {!n.read && (
+                                    <span className="min-w-5 h-5 px-1.5 bg-[#1DB954] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-xs ring-2 ring-white dark:ring-slate-900">
+                                      নতুন
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  )
+                ) : (
+                  /* CONVERSATION HISTORY LIST (PROFESSIONAL MARKETPLACE PROFILES) */
+                  <div className="divide-y divide-slate-100/80 dark:divide-slate-800/40">
                   {conversationList.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 text-xs">
                       কোনো চ্যাট হিস্ট্রি পাওয়া যায়নি।
@@ -726,17 +1420,12 @@ export const FloatingMessengerWindows: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                                  {c.name}
+                                <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+                                  <span className="truncate">{c.name}</span>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                                 </h4>
                                 {c.badge && (
-                                  <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
-                                    c.badge.includes('Official')
-                                      ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
-                                      : c.badge.includes('Top')
-                                      ? 'bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/30'
-                                      : 'bg-sky-500/10 text-sky-500 border border-sky-500/30'
-                                  }`}>
+                                  <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-bold border border-slate-200 dark:border-slate-700 shrink-0">
                                     {c.badge}
                                   </span>
                                 )}
@@ -747,12 +1436,12 @@ export const FloatingMessengerWindows: React.FC = () => {
                             </div>
 
                             {/* Role & Rating */}
-                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                              <span className="truncate">{c.role}</span>
+                            <div className="flex items-center justify-between gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                              <span className="truncate flex-1">{c.role}</span>
                               {c.rating && (
-                                <span className="flex items-center gap-0.5 text-amber-500 shrink-0 font-bold">
-                                  <Star className="w-2.5 h-2.5 fill-amber-500" />
-                                  {c.rating}
+                                <span className="hidden sm:flex items-center gap-1 text-slate-700 dark:text-slate-200 shrink-0 font-extrabold text-[10px] bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md">
+                                  <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                                  <span>{c.rating.toFixed(1)}</span>
                                 </span>
                               )}
                             </div>
@@ -763,7 +1452,7 @@ export const FloatingMessengerWindows: React.FC = () => {
                                 {c.lastMessage}
                               </p>
                               {c.unreadCount ? (
-                                <span className="min-w-4.5 h-4.5 px-1 bg-[#0084FF] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-xs">
+                                <span className="min-w-5 h-5 px-1.5 bg-[#1DB954] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white dark:ring-slate-900">
                                   {c.unreadCount}
                                 </span>
                               ) : null}
@@ -774,31 +1463,11 @@ export const FloatingMessengerWindows: React.FC = () => {
                     })
                   )}
                 </div>
+                )}
 
               </div>
 
-              {/* FLOATING ACTION BUTTONS AT BOTTOM RIGHT */}
-              <div className="absolute bottom-4 right-4 z-20 flex flex-col items-center gap-3 pointer-events-auto">
-                {/* Meta AI / Smart Sparkle Widget */}
-                <button
-                  type="button"
-                  onClick={() => setIsAiModalOpen(true)}
-                  className="w-11 h-11 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-purple-600 hover:scale-105 active:scale-95 transition cursor-pointer"
-                  title="PiTen AI Assistant"
-                >
-                  <Sparkles className="w-5 h-5 text-purple-500" />
-                </button>
 
-                {/* Blue Circular Plus Button for New Message */}
-                <button
-                  type="button"
-                  onClick={() => setIsNewChatModalOpen(true)}
-                  className="w-12 h-12 rounded-full bg-[#0084FF] hover:bg-[#0073e6] text-white flex items-center justify-center shadow-xl cursor-pointer transition active:scale-95 hover:scale-105"
-                  title="নতুন মেসেজ শুরু করুন"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
-              </div>
 
             </div>
 
@@ -1394,24 +2063,24 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
           </button>
 
           {/* Seller Avatar */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 p-[2px] rounded-full bg-gradient-to-tr from-emerald-400 via-blue-500 to-cyan-400 shadow-xs">
             <img
               src={win.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
               alt={win.senderName}
-              className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+              className="w-10 h-10 rounded-full object-cover border border-white dark:border-[#1C2733]"
             />
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1C2733]" />
           </div>
 
           {/* Seller Info */}
           <div className="min-w-0">
-            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-              <span>{win.senderName}</span>
-              <ShieldCheck className="w-4 h-4 text-[#0084FF] shrink-0" />
+            <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+              <span className="truncate">{win.senderName}</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
             </h3>
-            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Active now (অনলাইনে আছেন)</span>
+            <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate">অনলাইনে আছেন</span>
             </p>
           </div>
         </div>
@@ -1460,13 +2129,17 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
             alt={win.senderName}
             className="w-16 h-16 rounded-full object-cover mx-auto border-2 border-white dark:border-[#1C2733] shadow-md"
           />
-          <h4 className="text-base font-black text-slate-900 dark:text-white flex items-center justify-center gap-1">
+          <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center justify-center gap-1">
             <span>{win.senderName}</span>
-            <BadgeCheck className="w-4 h-4 text-[#0084FF]" />
+            <CheckCircle2 className="w-4 h-4 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="Verified Profile" />
           </h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {win.senderRole || 'ভেরিফাইড টপ সেলার'} • PiTen Secure Escrow
-          </p>
+          <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+            <span className="truncate">{win.senderRole || 'Pro Seller • React & Node Specialist'}</span>
+            <span className="hidden sm:flex items-center gap-1 text-slate-700 dark:text-slate-200 shrink-0 font-extrabold text-[11px] bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+              <span>4.9</span>
+            </span>
+          </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 rounded-full text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>এন্ড-টু-এন্ড এনক্রিপ্টেড ও ১০০% নিরাপদ পেমেন্ট হিস্ট্রি</span>
@@ -1494,7 +2167,47 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
                     : 'bg-white dark:bg-[#243447] text-slate-900 dark:text-slate-100 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl rounded-bl-xs'
                 }`}
               >
-                <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                {m.text.includes('💼') || m.text.includes('অফার') || m.text.includes('অর্ডার') ? (
+                  <div className="my-1 p-3.5 bg-gradient-to-br from-slate-900 via-slate-900 to-[#0B132B] text-white rounded-2xl border border-emerald-500/40 shadow-xl space-y-3 font-bengali">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400">
+                          <Briefcase className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">
+                            ডাইরেক্ট প্রজেক্ট অর্ডার কার্ড
+                          </span>
+                          <span className="text-xs font-bold text-slate-200">
+                            {win.senderName}-এর জন্য ব্যক্তিগত প্রস্তাব
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black border border-emerald-500/30">
+                        অপেক্ষমাণ (Pending)
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1 text-slate-200">
+                      <p className="whitespace-pre-wrap font-medium">{m.text}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          alert('অভিনন্দন! ডাইরেক্ট প্রজেক্ট অর্ডার কনফার্ম করা হয়েছে এবং এস্ক্রো গেটওয়েতে ফান্ড সিকিউরড করা হয়েছে।');
+                        }}
+                        className="w-full py-2 px-3 bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition active:scale-95"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>অর্ডার একসেপ্ট ও সিকিউরড পেমেন্ট</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                )}
 
                 {m.meetLink && (
                   <div className="mt-2.5 p-3 bg-slate-900 text-white border border-[#0084FF]/60 rounded-2xl space-y-2">
@@ -1551,7 +2264,7 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
           <span>প্রজেক্টটি সম্পন্ন হয়েছে ও ডেলিভারি রিলিজড। চ্যাট মোড বন্ধ রয়েছে।</span>
         </div>
       ) : (
-        <form onSubmit={handleSend} className="p-3 bg-white dark:bg-[#1C2733] border-t border-slate-200/80 dark:border-slate-800 flex items-center gap-2 shrink-0">
+        <form onSubmit={handleSend} className="p-1.5 sm:p-2.5 bg-white dark:bg-[#1C2733] border-t border-slate-200/80 dark:border-slate-800 flex items-center gap-1 sm:gap-2 shrink-0 w-full max-w-full overflow-hidden">
           <input
             type="file"
             ref={fileInputRef}
@@ -1559,34 +2272,34 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
             className="hidden"
           />
 
-          {/* Attach file */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-[#0084FF] hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-full transition cursor-pointer shrink-0"
-            title="ছবি বা ফাইল সংযুক্ত করুন"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-
-          {/* Custom Offer mobile icon */}
+          {/* 1. New Order Button */}
           <button
             type="button"
             onClick={() => setIsOfferModalOpen(true)}
-            className="sm:hidden p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-full transition cursor-pointer shrink-0"
-            title="কাস্টম অফার পাঠান"
+            className="p-1.5 sm:p-2 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-full transition cursor-pointer shrink-0 active:scale-95"
+            title="নতুন ডাইরেক্ট প্রজেক্ট অর্ডার পাঠান"
           >
-            <Briefcase className="w-5 h-5" />
+            <ShoppingBag className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
 
-          {/* Emoji */}
+          {/* 2. Attach file */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-1.5 sm:p-2 text-[#0084FF] hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-full transition cursor-pointer shrink-0"
+            title="ছবি বা ফাইল সংযুক্ত করুন"
+          >
+            <Paperclip className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+          </button>
+
+          {/* 3. Emoji */}
           <button
             type="button"
             onClick={() => setShowEmojis(!showEmojis)}
-            className="p-2 text-[#0084FF] hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-full transition cursor-pointer shrink-0"
+            className="p-1.5 sm:p-2 text-[#0084FF] hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-full transition cursor-pointer shrink-0"
             title="ইমোজি"
           >
-            <Smile className="w-5 h-5" />
+            <Smile className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
 
           <input
@@ -1594,27 +2307,22 @@ const FullScreenChatThread: React.FC<FullScreenChatThreadProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="মেসেজ লিখুন..."
-            className="flex-1 bg-slate-100 dark:bg-[#243447] border-0 rounded-full px-4 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0084FF]"
+            className="min-w-0 flex-1 bg-slate-100 dark:bg-[#243447] border-0 rounded-full px-2.5 sm:px-4 py-1.5 sm:py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0084FF]"
           />
 
-          {inputText.trim() ? (
-            <button
-              type="submit"
-              className="p-2.5 bg-[#0084FF] hover:bg-[#0073e6] text-white rounded-full cursor-pointer transition shadow-md shrink-0 active:scale-95"
-              title="মেসেজ পাঠান"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onSend('👍')}
-              className="p-2.5 text-[#0084FF] hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-full cursor-pointer transition shrink-0 active:scale-110"
-              title="লাইক (👍) পাঠান"
-            >
-              <ThumbsUp className="w-5 h-5" />
-            </button>
-          )}
+          {/* Send Message Button - Always visible */}
+          <button
+            type="submit"
+            disabled={!inputText.trim()}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full cursor-pointer transition shadow-xs shrink-0 active:scale-95 flex items-center justify-center ${
+              inputText.trim()
+                ? 'bg-[#0084FF] hover:bg-[#0073e6] text-white opacity-100'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+            }`}
+            title="মেসেজ পাঠান"
+          >
+            <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
         </form>
       )}
 

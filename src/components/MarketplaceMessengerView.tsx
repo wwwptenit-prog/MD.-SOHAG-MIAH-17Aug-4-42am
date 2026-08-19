@@ -29,7 +29,8 @@ import {
   DollarSign,
   FileText,
   BadgeCheck,
-  Sparkle
+  Sparkle,
+  ShoppingBag
 } from 'lucide-react';
 
 interface ConversationItem {
@@ -252,17 +253,26 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
     }
   });
 
-  const conversationList = Array.from(allConversationsMap.values()).filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.role.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    if (!matchesSearch) return false;
-    if (activeCategoryFilter === 'sellers') return c.category === 'sellers';
-    if (activeCategoryFilter === 'orders') return c.category === 'orders';
-    if (activeCategoryFilter === 'online') return c.isOnline;
-    return true;
-  });
+  const conversationList = Array.from(allConversationsMap.values())
+    .filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.role.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      if (activeCategoryFilter === 'sellers') return c.category === 'sellers';
+      if (activeCategoryFilter === 'orders') return c.category === 'orders';
+      if (activeCategoryFilter === 'online') return c.isOnline;
+      return true;
+    })
+    .sort((a, b) => {
+      const unreadA = a.unreadCount || 0;
+      const unreadB = b.unreadCount || 0;
+      if (unreadA > 0 && unreadB === 0) return -1;
+      if (unreadB > 0 && unreadA === 0) return 1;
+      if (unreadA !== unreadB) return unreadB - unreadA;
+      return 0;
+    });
 
   // Top Active Stories / Contacts
   const topActiveStories = [
@@ -339,8 +349,8 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
                   <span>Messages</span>
                   <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
                 </h1>
-                <p className="text-[10px] font-bold text-slate-400">
-                  PiTen Marketplace Direct Messenger
+                <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">
+                  PTENit Marketplace Inbox
                 </p>
               </div>
             </div>
@@ -359,8 +369,8 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
             </div>
           </div>
 
-          {/* SEARCH BAR (HIDDEN ON PHONE VIEW WHEN EMBEDDED, AS SEARCH IS IN TOP ATTACHED BAR) */}
-          <div className={`px-3.5 pt-3 pb-2 shrink-0 ${isEmbedded ? 'hidden sm:block' : 'block'}`}>
+          {/* SEARCH BAR (HIDDEN ON PHONE VIEW FOR MAXIMUM VERTICAL SPACE) */}
+          <div className="hidden md:block px-3.5 pt-3 pb-2 shrink-0">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -517,17 +527,12 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
-                            {c.name}
+                          <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+                            <span className="truncate">{c.name}</span>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                           </h4>
                           {c.badge && (
-                            <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full shrink-0 ${
-                              c.badge.includes('Official')
-                                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
-                                : c.badge.includes('Top')
-                                ? 'bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/30'
-                                : 'bg-sky-500/10 text-sky-500 border border-sky-500/30'
-                            }`}>
+                            <span className="px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-bold border border-slate-200 dark:border-slate-700 shrink-0">
                               {c.badge}
                             </span>
                           )}
@@ -538,12 +543,12 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
                       </div>
 
                       {/* Role & Rating */}
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                        <span className="truncate">{c.role}</span>
+                      <div className="flex items-center justify-between gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                        <span className="truncate flex-1">{c.role}</span>
                         {c.rating && (
-                          <span className="flex items-center gap-0.5 text-amber-500 shrink-0 font-bold">
-                            <Star className="w-2.5 h-2.5 fill-amber-500" />
-                            {c.rating}
+                          <span className="hidden sm:flex items-center gap-1 text-slate-700 dark:text-slate-200 shrink-0 font-extrabold text-[10px] bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                            <span>{c.rating.toFixed(1)}</span>
                           </span>
                         )}
                       </div>
@@ -554,7 +559,7 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
                           {c.lastMessage}
                         </p>
                         {c.unreadCount ? (
-                          <span className="min-w-4.5 h-4.5 px-1 bg-[#1DB954] text-slate-950 text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-xs">
+                          <span className="min-w-5 h-5 px-1.5 bg-[#1DB954] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-sm ring-2 ring-white dark:ring-slate-900">
                             {c.unreadCount}
                           </span>
                         ) : null}
@@ -566,28 +571,7 @@ export const MarketplaceMessengerView: React.FC<MarketplaceMessengerViewProps> =
             )}
           </div>
 
-          {/* FLOATING ACTION BUTTONS AT BOTTOM RIGHT OF CONVERSATIONS */}
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col items-center gap-2.5 pointer-events-auto">
-            {/* Meta AI / Smart Sparkle Widget */}
-            <button
-              type="button"
-              onClick={() => setIsAiModalOpen(true)}
-              className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-purple-600 hover:scale-105 active:scale-95 transition cursor-pointer"
-              title="PiTen AI Assistant"
-            >
-              <Sparkles className="w-4.5 h-4.5 text-purple-500" />
-            </button>
 
-            {/* Green Circular Plus Button for New Message */}
-            <button
-              type="button"
-              onClick={() => setIsNewChatModalOpen(true)}
-              className="w-11 h-11 rounded-full bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 flex items-center justify-center shadow-xl cursor-pointer transition active:scale-95 hover:scale-105 font-black"
-              title="নতুন মেসেজ শুরু করুন"
-            >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
-            </button>
-          </div>
 
         </div>
 
@@ -1003,41 +987,41 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-white dark:bg-[#18222D]">
-      {/* TOP HEADER BAR (HIDDEN ON PHONE VIEW AS ATTACHED DARK BAR HANDLES IT) */}
-      <div className="hidden md:flex px-3 sm:px-4 py-2.5 bg-white dark:bg-[#1C2733] border-b border-slate-200/80 dark:border-slate-800 items-center justify-between shrink-0 shadow-xs">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          {/* Prominent Back Button (Always visible on mobile, allows returning to conversation list) */}
+      {/* TOP HEADER BAR (VISIBLE ON ALL SCREENS INCLUDING PHONE VIEW) */}
+      <div className="flex px-2.5 sm:px-4 py-2 bg-white dark:bg-[#1C2733] border-b border-slate-200/80 dark:border-slate-800 items-center justify-between shrink-0 shadow-2xs">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Prominent Back Button */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onBack();
             }}
-            className="p-1.5 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white transition cursor-pointer active:scale-95 shrink-0"
+            className="p-1 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-900 dark:text-white transition cursor-pointer active:scale-95 shrink-0"
             title="ইনবক্সে ফিরে যান"
           >
-            <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
 
           {/* Seller Avatar */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 p-[1.5px] rounded-full bg-gradient-to-tr from-emerald-400 via-blue-500 to-cyan-400 shadow-xs">
             <img
               src={win.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
               alt={win.senderName}
-              className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-white dark:border-[#1C2733]"
             />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1C2733]" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white dark:border-[#1C2733]" />
           </div>
 
           {/* Seller Info */}
           <div className="min-w-0">
-            <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate flex items-center gap-1.5">
-              <span>{win.senderName}</span>
-              <ShieldCheck className="w-4 h-4 text-[#1DB954] shrink-0" />
+            <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate flex items-center gap-1">
+              <span className="truncate">{win.senderName}</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
             </h3>
-            <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Active now (অনলাইনে আছেন)</span>
+            <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="truncate">অনলাইনে আছেন</span>
             </p>
           </div>
         </div>
@@ -1090,11 +1074,15 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
           />
           <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center justify-center gap-1">
             <span>{win.senderName}</span>
-            <BadgeCheck className="w-4 h-4 text-[#1DB954]" />
+            <CheckCircle2 className="w-4 h-4 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="Verified Profile" />
           </h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {win.senderRole || 'ভেরিফাইড টপ সেলার'} • PiTen Secure Escrow
-          </p>
+          <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+            <span className="truncate">{win.senderRole || 'Pro Seller • React & Node Specialist'}</span>
+            <span className="hidden sm:flex items-center gap-1 text-slate-700 dark:text-slate-200 shrink-0 font-extrabold text-[11px] bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+              <span>4.9</span>
+            </span>
+          </div>
         </div>
 
         {win.messages.map((m) => (
@@ -1118,7 +1106,47 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
                     : 'bg-white dark:bg-[#243447] text-slate-900 dark:text-slate-100 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl rounded-bl-xs'
                 }`}
               >
-                <p className="whitespace-pre-wrap">{m.text}</p>
+                {m.text.includes('💼') || m.text.includes('অফার') || m.text.includes('অর্ডার') ? (
+                  <div className="my-1 p-3.5 bg-gradient-to-br from-slate-900 via-slate-900 to-[#0B132B] text-white rounded-2xl border border-emerald-500/40 shadow-xl space-y-3 font-bengali">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400">
+                          <Briefcase className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block">
+                            ডাইরেক্ট প্রজেক্ট অর্ডার কার্ড
+                          </span>
+                          <span className="text-xs font-bold text-slate-200">
+                            {win.senderName}-এর জন্য ব্যক্তিগত প্রস্তাব
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black border border-emerald-500/30">
+                        অপেক্ষমাণ (Pending)
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1 text-slate-200">
+                      <p className="whitespace-pre-wrap font-medium">{m.text}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          alert('অভিনন্দন! ডাইরেক্ট প্রজেক্ট অর্ডার কনফার্ম করা হয়েছে এবং এস্ক্রো গেটওয়েতে ফান্ড সিকিউরড করা হয়েছে।');
+                        }}
+                        className="w-full py-2 px-3 bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition active:scale-95"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>অর্ডার একসেপ্ট ও সিকিউরড পেমেন্ট</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap">{m.text}</p>
+                )}
                 {m.meetLink && (
                   <a
                     href={m.meetLink}
@@ -1161,7 +1189,7 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSend} className="flex items-center gap-2">
+        <form onSubmit={handleSend} className="flex items-center gap-1 sm:gap-2 w-full max-w-full overflow-hidden">
           {/* File attachment input hidden */}
           <input
             type="file"
@@ -1170,22 +1198,34 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
             className="hidden"
           />
 
+          {/* 1. New Order Button */}
+          <button
+            type="button"
+            onClick={() => setIsOfferModalOpen(true)}
+            className="p-1.5 sm:p-2 text-[#1DB954] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-full transition cursor-pointer shrink-0 active:scale-95"
+            title="নতুন ডাইরেক্ট প্রজেক্ট অর্ডার পাঠান"
+          >
+            <ShoppingBag className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+          </button>
+
+          {/* 2. Attach file */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-slate-400 hover:text-[#1DB954] dark:hover:text-[#1DB954] transition cursor-pointer shrink-0"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-[#1DB954] dark:hover:text-[#1DB954] transition cursor-pointer shrink-0"
             title="ফাইল বা ছবি সংযুক্ত করুন"
           >
-            <Paperclip className="w-5 h-5" />
+            <Paperclip className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
 
+          {/* 3. Emoji */}
           <button
             type="button"
             onClick={() => setShowEmojis(!showEmojis)}
-            className="p-2 text-slate-400 hover:text-amber-500 transition cursor-pointer shrink-0"
+            className="p-1.5 sm:p-2 text-slate-400 hover:text-amber-500 transition cursor-pointer shrink-0"
             title="ইমোজি"
           >
-            <Smile className="w-5 h-5" />
+            <Smile className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
           </button>
 
           <input
@@ -1193,27 +1233,22 @@ const EmbeddedChatThread: React.FC<EmbeddedChatThreadProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="মেসেজ লিখুন..."
-            className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800/80 rounded-full text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+            className="min-w-0 flex-1 px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-slate-100 dark:bg-slate-800/80 rounded-full text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
           />
 
-          {inputText.trim() ? (
-            <button
-              type="submit"
-              className="p-2.5 bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 rounded-full cursor-pointer transition active:scale-95 shadow-md shrink-0"
-              title="পাঠান"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onSend('👍')}
-              className="p-2 text-[#1DB954] hover:scale-110 transition cursor-pointer shrink-0"
-              title="থাম্বস আপ পাঠান"
-            >
-              <ThumbsUp className="w-5 h-5" />
-            </button>
-          )}
+          {/* Send Message Button - Always visible */}
+          <button
+            type="submit"
+            disabled={!inputText.trim()}
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full cursor-pointer transition active:scale-95 shadow-xs shrink-0 flex items-center justify-center ${
+              inputText.trim()
+                ? 'bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 opacity-100'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+            }`}
+            title="পাঠান"
+          >
+            <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
         </form>
       </div>
 

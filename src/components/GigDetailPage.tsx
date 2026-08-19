@@ -384,7 +384,7 @@ export const GigDetailPage: React.FC<GigDetailPageProps> = ({
               <div>
                 <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
                   <span>{gig.sellerName}</span>
-                  <BadgeCheck className="w-4 h-4 sm:w-5 sm:h-5 text-[#1DB954]" title="Verified Seller" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-bold">
                   {gig.sellerTitle || 'Top Rated Service Provider'}
@@ -751,9 +751,7 @@ export const GigDetailPage: React.FC<GigDetailPageProps> = ({
                       <div>
                         <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                           <span>{gig.sellerName}</span>
-                          <span className="px-2.5 py-0.5 bg-[#1DB954]/20 text-[#1DB954] text-xs font-bold rounded-full">
-                            Verified Pro Seller
-                          </span>
+                          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-[#0084FF] fill-[#0084FF] text-white shrink-0" title="ভেরিফাইড প্রোফাইল" />
                         </h4>
                         <p className="text-xs sm:text-sm text-slate-500 font-bold mt-1">
                           {gig.sellerTitle || 'Senior Developer & Tech Specialist'}

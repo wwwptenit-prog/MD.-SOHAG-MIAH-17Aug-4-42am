@@ -143,6 +143,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
     payouts,
     requestTeacherPayout,
     notifications,
+    openNotificationCenter,
     markNotificationRead,
     markAllNotificationsRead,
     sendCentralNotification,
@@ -2057,17 +2058,12 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     if (openAuthModal) openAuthModal();
                     return;
                   }
-                  setSelectedGig(null);
-                  setViewMode('buying');
-                  setActiveSubTab('my-courses');
-                  setIsInboxModalOpen(false);
-                  setIsNotificationsOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  openMessengerInbox();
                 }}
                 className={`flex-1 flex justify-center items-center py-1.5 transition active:scale-95 cursor-pointer ${
                   activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
                 }`}
-                title="আমার কোর্সসমূহ"
+                title="আমার কোর্সসমূহ ও লার্নিং ফিচারস"
               >
                 <BookOpen className={`w-5 h-5 ${activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
               </button>
@@ -2080,19 +2076,12 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     if (openAuthModal) openAuthModal();
                     return;
                   }
-                  setSelectedGig(null);
-                  setViewMode('buying');
-                  setActiveSubTab('messenger');
-                  setIsInboxModalOpen(false);
-                  setIsNotificationsOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  openMessengerInbox();
                 }}
-                className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                  activeSubTab === 'messenger' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
-                }`}
+                className="flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer text-white hover:text-[#1DB954]"
                 title="মেসেঞ্জার"
               >
-                <Mail className={`w-5 h-5 ${activeSubTab === 'messenger' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
+                <Mail className="w-5 h-5 text-white" />
                 {currentUser && directMessages.filter(m => !m.read).length > 0 && (
                   <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-slate-950 text-[9px] font-black flex items-center justify-center shadow-xs">
                     {directMessages.filter(m => !m.read).length}
@@ -2108,15 +2097,12 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     if (openAuthModal) openAuthModal();
                     return;
                   }
-                  setIsNotificationsOpen(!isNotificationsOpen);
-                  setIsInboxModalOpen(false);
+                  openNotificationCenter();
                 }}
-                className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                  isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
-                }`}
+                className="flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer text-white hover:text-[#1DB954]"
                 title="নোটিফিকেশন"
               >
-                <Bell className={`w-5 h-5 ${isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
+                <Bell className="w-5 h-5 text-white" />
                 {currentUser && notifications.filter(n => !n.read).length > 0 && (
                   <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
                     {notifications.filter(n => !n.read).length}
@@ -2205,17 +2191,19 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                         type="button"
                         onClick={() => {
                           if (setActiveMessengerConversationId) setActiveMessengerConversationId(null);
+                          setIsMessengerSearchActive(false);
+                          setMessengerSearchQuery('');
                         }}
                         className="p-1 -ml-1 rounded-lg text-slate-200 hover:text-white hover:bg-slate-800/80 transition cursor-pointer shrink-0"
                         title="ইনবক্সে ফিরে যান"
                       >
                         <ChevronLeft className="w-5 h-5 text-slate-100" />
                       </button>
-                      <div className="relative shrink-0">
+                      <div className="relative shrink-0 p-[2px] rounded-full bg-gradient-to-tr from-emerald-400 via-blue-500 to-cyan-400 shadow-xs">
                         <img
                           src={activeMessengerUser.avatar}
                           alt={activeMessengerUser.name}
-                          className="w-8 h-8 rounded-full object-cover border border-slate-700/80 shadow-2xs"
+                          className="w-8 h-8 rounded-full object-cover border border-[#0B132B]"
                         />
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#1DB954] border-2 border-[#0B132B]" />
                       </div>
@@ -2226,9 +2214,8 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                           </h2>
                           <BadgeCheck className="w-3.5 h-3.5 text-blue-400 shrink-0 fill-blue-400/20" />
                         </div>
-                        <p className="text-[10px] text-[#1DB954] font-bold leading-none mt-0.5 truncate flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] shrink-0" />
-                          <span>Active now (অনলাইনে আছেন)</span>
+                        <p className="text-[10px] text-[#1DB954] font-bold leading-none mt-0.5 truncate">
+                          Active now
                         </p>
                       </div>
                     </div>
@@ -2307,7 +2294,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                           <h2 className="text-sm font-black text-white tracking-tight leading-none">Messages</h2>
                           <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
                         </div>
-                        <p className="text-[10px] text-slate-400 font-bold leading-tight mt-0.5">PiTen Marketplace Inbox</p>
+                        <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-sans">PTENit Marketplace Inbox</p>
                       </div>
                     </div>
 
@@ -2499,14 +2486,9 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                 {/* Notification Bell */}
                 <button
                   onClick={() => {
-                    setIsNotificationsOpen(!isNotificationsOpen);
-                    setIsInboxModalOpen(false);
+                    openNotificationCenter();
                   }}
-                  className={`relative p-2 rounded-xl transition cursor-pointer flex items-center justify-center border ${
-                    isNotificationsOpen
-                      ? 'bg-[#1DB954] text-slate-950 border-[#1DB954] font-bold shadow-md shadow-[#1DB954]/20'
-                      : 'bg-slate-800/80 hover:bg-slate-700/90 text-slate-200 hover:text-white border-slate-700/60'
-                  }`}
+                  className="relative p-2 rounded-xl transition cursor-pointer flex items-center justify-center border bg-slate-800/80 hover:bg-slate-700/90 text-slate-200 hover:text-white border-slate-700/60"
                   title="নটিফিকেশনসমূহ"
                 >
                   <Bell className="w-4.5 h-4.5" />

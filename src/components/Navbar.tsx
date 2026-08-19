@@ -69,7 +69,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     sendDirectMessage,
     openChatWindow,
     createGoogleMeetCall,
-    openMessengerInbox
+    openMessengerInbox,
+    openNotificationCenter
   } = useData();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -465,292 +466,47 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* MESSAGES INBOX & NOTIFICATIONS BELL (ONLY FOR LOGGED IN USERS) */}
               {currentUser && (
                 <>
-                  <div className="relative">
-                <button
-                  onClick={() => {
-                    setRoleSwitcherOpen(false);
-                    setUserDropdownOpen(false);
-                    setNavNotifOpen(false);
-                    setNavMsgOpen(false);
-                    openMessengerInbox();
-                  }}
-                  className="p-2 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white hover:border-[#1DB954] transition-all cursor-pointer relative"
-                  title="মেসেঞ্জার - সবার এসএমএস ও অনলাইন তালিকা"
-                >
-                  <MessageSquare className="w-4 h-4 text-[#1DB954]" />
-                  {unreadMsgCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#1DB954] text-white font-black text-[10px] rounded-full flex items-center justify-center animate-bounce shadow-md border-2 border-[#142B4D]">
-                      {unreadMsgCount}
-                    </span>
-                  )}
-                </button>
-
-                  {navMsgOpen && (
-                    <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-[#142B4D] border border-slate-700 rounded-2xl shadow-2xl p-4 text-slate-200 z-50">
-                      
-                      {/* VIEW MODE 1: LIST OF MESSAGES */}
-                      {!selectedMsgId ? (
-                        <>
-                          <div className="flex justify-between items-center pb-2 border-b border-slate-700 mb-3 font-bengali">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm text-white">ইনবক্স ও ইনস্ট্যান্ট বার্তা</span>
-                              {unreadMsgCount > 0 && (
-                                <span className="bg-[#1DB954]/20 text-[#1DB954] border border-[#1DB954]/40 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  {unreadMsgCount} টি পড়া বাকি
-                                </span>
-                              )}
-                            </div>
-                            {unreadMsgCount > 0 && (
-                              <button
-                                onClick={markAllDirectMessagesRead}
-                                className="text-[11px] text-[#1DB954] hover:underline font-bold cursor-pointer"
-                              >
-                                সবগুলো পড়া চিহ্নিত করুন
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="space-y-2 max-h-72 overflow-y-auto font-bengali pr-1">
-                            {directMessages.length === 0 ? (
-                              <p className="text-xs text-slate-400 text-center py-4">কোনো মেসেজ বা বার্তা নেই।</p>
-                            ) : (
-                              directMessages.map(msg => (
-                                <div
-                                  key={msg.id}
-                                  onClick={() => {
-                                    markDirectMessageRead(msg.id);
-                                    openChatWindow({
-                                      id: msg.id,
-                                      senderName: msg.senderName,
-                                      senderRole: msg.senderRole,
-                                      senderAvatar: msg.senderAvatar,
-                                      initialMessage: msg.text
-                                    });
-                                    const targetTab = msg.targetTab || 
-                                      (msg.senderRole === 'customer' || msg.senderRole === 'seller' || msg.orderId ? 'marketplace' :
-                                       msg.senderRole === 'instructor' || msg.senderRole === 'teacher' ? 'teacher-dashboard' :
-                                       msg.senderRole === 'admin' ? 'admin' : 'student-dashboard');
-                                    setActiveTab(targetTab);
-                                    setNavMsgOpen(false);
-                                  }}
-                                  className={`p-3 rounded-xl text-xs cursor-pointer transition-all flex items-start gap-2.5 ${
-                                    msg.read
-                                      ? 'bg-slate-800/40 border border-slate-800 text-slate-400 hover:bg-slate-800'
-                                      : 'bg-slate-800 border border-emerald-500/40 text-white shadow-sm hover:border-[#1DB954]'
-                                  }`}
-                                >
-                                  <img
-                                    src={msg.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-                                    alt={msg.senderName}
-                                    className="w-9 h-9 rounded-full object-cover border border-[#1DB954] shrink-0 mt-0.5"
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex justify-between items-center gap-1">
-                                      <p className="font-bold text-xs text-white truncate">{msg.senderName}</p>
-                                      <span className="text-[9px] text-slate-400 shrink-0">{msg.time}</span>
-                                    </div>
-                                    <p className={`text-[11px] line-clamp-2 mt-0.5 ${msg.read ? 'text-slate-400' : 'text-slate-200'}`}>
-                                      {msg.text}
-                                    </p>
-                                    <span className="text-[9px] text-[#1DB954] font-bold mt-1 block">
-                                      পড়তে ক্লিক করুন →
-                                    </span>
-                                  </div>
-                                  {!msg.read && (
-                                    <span className="w-2.5 h-2.5 rounded-full bg-[#1DB954] shrink-0 mt-1 shadow-sm shadow-[#1DB954]" />
-                                  )}
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        /* VIEW MODE 2: DETAILED MESSAGE READER & QUICK REPLY */
-                        (() => {
-                          const activeMsg = directMessages.find(m => m.id === selectedMsgId);
-                          if (!activeMsg) {
-                            return (
-                              <button onClick={() => setSelectedMsgId(null)} className="text-xs text-[#1DB954]">
-                                ← মেসেজ তালিকায় ফিরে যান
-                              </button>
-                            );
-                          }
-                          return (
-                            <div className="space-y-3 font-bengali">
-                              <div className="flex items-center justify-between pb-2 border-b border-slate-700">
-                                <button
-                                  onClick={() => setSelectedMsgId(null)}
-                                  className="text-xs text-[#1DB954] hover:underline font-bold flex items-center gap-1 cursor-pointer"
-                                >
-                                  <ArrowLeft className="w-3.5 h-3.5" />
-                                  <span>মেসেজ তালিকা</span>
-                                </button>
-                                <span className="text-[10px] bg-emerald-500/20 text-[#1DB954] border border-[#1DB954]/30 px-2 py-0.5 rounded-full font-bold">
-                                  {activeMsg.senderRole === 'customer' ? 'বায়ার বার্তা' : activeMsg.senderRole === 'instructor' ? 'সেলার বার্তা' : 'নোটিফিকেশন'}
-                                </span>
-                              </div>
-
-                              {/* Sender Profile Header */}
-                              <div className="flex items-center gap-2.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                                <img
-                                  src={activeMsg.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-                                  alt={activeMsg.senderName}
-                                  className="w-9 h-9 rounded-full object-cover border border-[#1DB954]"
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-black text-xs text-white truncate">{activeMsg.senderName}</p>
-                                  <p className="text-[10px] text-slate-400">{activeMsg.time}</p>
-                                </div>
-                              </div>
-
-                              {/* Full Message Body */}
-                              <div className="p-3 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-100 leading-relaxed font-bengali max-h-48 overflow-y-auto">
-                                {activeMsg.text}
-                              </div>
-
-                              {/* Quick Reply Form */}
-                              <div className="pt-2 border-t border-slate-700 space-y-2">
-                                {!replySentSuccess ? (
-                                  <div className="space-y-2">
-                                    <textarea
-                                      value={replyText}
-                                      onChange={(e) => setReplyText(e.target.value)}
-                                      placeholder="আপনার উত্তর বা বার্তা টাইপ করুন..."
-                                      className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#1DB954] font-bengali resize-none"
-                                      rows={2}
-                                    />
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[10px] text-slate-400 font-bold">🔒 সুরক্ষিত এস্ক্রো চ্যাট</span>
-                                      <button
-                                        onClick={() => {
-                                          if (!replyText.trim()) return;
-                                          sendDirectMessage({
-                                            senderName: currentUser?.name || 'আমি',
-                                            senderRole: currentUser?.role || 'customer',
-                                            senderAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-                                            recipientRole: 'all',
-                                            text: `উত্তর: ${replyText}`,
-                                            time: 'এখন'
-                                          });
-                                          setReplySentSuccess(true);
-                                          setReplyText('');
-                                        }}
-                                        disabled={!replyText.trim()}
-                                        className="px-3.5 py-1.5 bg-[#1DB954] hover:bg-[#19a34a] disabled:opacity-50 text-white font-black text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition shadow-sm"
-                                      >
-                                        <Send className="w-3 h-3" />
-                                        <span>উত্তর পাঠান</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="p-2.5 bg-emerald-500/20 border border-[#1DB954]/50 rounded-xl text-xs text-[#1DB954] font-bold flex items-center justify-between">
-                                    <span className="flex items-center gap-1.5">
-                                      <CheckCircle className="w-4 h-4 text-[#1DB954]" />
-                                      <span>✓ উত্তর সফলভাবে মেসেজে জমা হয়েছে!</span>
-                                    </span>
-                                    <button
-                                      onClick={() => setReplySentSuccess(false)}
-                                      className="text-[10px] underline font-black text-white hover:text-[#1DB954] cursor-pointer"
-                                    >
-                                      নতুন বার্তা
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()
-                      )}
-                    </div>
-                  )}
-                </div>
-
-              {/* NOTIFICATION BELL */}
-              <div className="relative">
+                  {/* MESSENGER BUTTON */}
                   <button
                     onClick={() => {
                       setRoleSwitcherOpen(false);
                       setUserDropdownOpen(false);
+                      setNavNotifOpen(false);
                       setNavMsgOpen(false);
-                      setNavNotifOpen(!navNotifOpen);
+                      openMessengerInbox();
                     }}
                     className="p-2 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white hover:border-[#1DB954] transition-all cursor-pointer relative"
-                    title="নোটিফিকেশন"
+                    title="মেসেঞ্জার - সবার এসএমএস ও অনলাইন তালিকা"
                   >
-                    <Bell className="w-4 h-4 text-[#1DB954]" />
-                    {unreadNavNotifCount > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white font-black text-[10px] rounded-full flex items-center justify-center animate-pulse shadow-md border-2 border-[#142B4D]">
-                        {unreadNavNotifCount}
+                    <MessageSquare className="w-4 h-4 text-[#1DB954]" />
+                    {unreadMsgCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#1DB954] text-white font-black text-[10px] rounded-full flex items-center justify-center animate-bounce shadow-md border-2 border-[#142B4D]">
+                        {unreadMsgCount}
                       </span>
                     )}
                   </button>
 
-                  {navNotifOpen && (
-                    <div className="absolute right-0 mt-3 w-80 bg-[#142B4D] border border-slate-700 rounded-2xl shadow-2xl p-4 text-slate-200 z-50">
-                      <div className="flex justify-between items-center pb-2 border-b border-slate-700 mb-3 font-bengali">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-white">নোটিফিকেশনসমূহ</span>
-                          {unreadNavNotifCount > 0 && (
-                            <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {unreadNavNotifCount} টি নতুন
-                            </span>
-                          )}
-                        </div>
-                        {unreadNavNotifCount > 0 && (
-                          <button
-                            onClick={markAllNotificationsRead}
-                            className="text-[11px] text-[#1DB954] hover:underline font-bold cursor-pointer"
-                          >
-                            সবগুলো পড়া চিহ্নিত করুন
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 max-h-64 overflow-y-auto font-bengali">
-                        {notifications.length === 0 ? (
-                          <p className="text-xs text-slate-400 text-center py-4">কোনো নোটিফিকেশন নেই।</p>
-                        ) : (
-                          notifications.map(n => (
-                            <div
-                              key={n.id}
-                              onClick={() => {
-                                markNotificationRead(n.id);
-                                const targetTab = n.targetTab || (
-                                  n.title.includes('মার্কেটপ্লেস') || n.title.includes('গিগ') || n.title.includes('অর্ডার') ? 'marketplace' :
-                                  n.title.includes('টিচার') || n.title.includes('পে-আউট') ? 'teacher-dashboard' :
-                                  n.title.includes('কাস্টমার') || n.title.includes('প্রজেক্ট') ? 'marketplace' :
-                                  n.title.includes('এডমিন') ? 'admin' : 'customer-dashboard'
-                                );
-                                setActiveTab(targetTab);
-                                setNavNotifOpen(false);
-                              }}
-                              className={`p-3 rounded-xl text-xs cursor-pointer transition-all ${
-                                n.read
-                                  ? 'bg-slate-800/40 border border-slate-800 text-slate-400 hover:bg-slate-800'
-                                  : 'bg-slate-800 border border-emerald-500/40 text-white shadow-sm hover:border-[#1DB954]'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start gap-1">
-                                <p className="font-bold text-xs mb-0.5 text-white">{n.title}</p>
-                                {!n.read && (
-                                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 mt-1 shadow-sm shadow-rose-500" />
-                                )}
-                              </div>
-                              <p className={`text-[11px] leading-relaxed mt-0.5 ${n.read ? 'text-slate-400' : 'text-slate-200'}`}>{n.message}</p>
-                              <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-700/50">
-                                <span className="text-[10px] text-slate-400 font-medium">{n.time}</span>
-                                <span className="text-[10px] text-[#1DB954] font-bold hover:underline">
-                                  দেখা ও প্রজেক্টে যান →
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  {/* NOTIFICATION BELL */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setRoleSwitcherOpen(false);
+                        setUserDropdownOpen(false);
+                        setNavMsgOpen(false);
+                        setNavNotifOpen(false);
+                        openNotificationCenter();
+                      }}
+                      className="p-2 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 hover:text-white hover:border-[#1DB954] transition-all cursor-pointer relative"
+                      title="নোটিফিকেশন সেন্টার"
+                    >
+                      <Bell className="w-4 h-4 text-[#1DB954]" />
+                      {unreadNavNotifCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white font-black text-[10px] rounded-full flex items-center justify-center animate-pulse shadow-md border-2 border-[#142B4D]">
+                          {unreadNavNotifCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
                 </>
               )}
 
@@ -927,7 +683,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {/* Mobile Actions: User Profile Avatar Popup and Menu Drawer Button */}
+            {/* Mobile Actions: User Profile Avatar and Menu Drawer Button */}
             <div className="flex md:hidden items-center gap-1.5 shrink-0">
               {/* Mobile User Profile Avatar Trigger */}
               {currentUser ? (
@@ -987,6 +743,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 <span>মেসেঞ্জার ও ইনবক্স (সকল বার্তা)</span>
                               </span>
                               <span className="text-[10px] bg-emerald-500 text-white font-black px-1.5 py-0.5 rounded-full">অনলাইন</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setUserDropdownOpen(false);
+                                openNotificationCenter();
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#1DB954]/10 hover:bg-[#1DB954]/20 border border-[#1DB954]/30 text-xs font-bold text-[#1DB954] hover:text-white transition cursor-pointer"
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <Bell className="w-4 h-4 text-[#1DB954]" />
+                                <span>নোটিফিকেশন সেন্টার (সকল নোটিশ)</span>
+                              </span>
+                              {unreadNavNotifCount > 0 && (
+                                <span className="text-[10px] bg-[#1DB954] text-white font-black px-1.5 py-0.5 rounded-full">
+                                  {unreadNavNotifCount} টি নতুন
+                                </span>
+                              )}
                             </button>
 
                             <button
