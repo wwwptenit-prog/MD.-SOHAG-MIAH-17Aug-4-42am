@@ -33,16 +33,117 @@ const MainAppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [marketplaceCategory, setMarketplaceCategory] = useState<string>('All');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [learningCourseId, setLearningCourseId] = useState<string | null>(null);
+  const [activeCertificateCode, setActiveCertificateCode] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  const handleSetActiveTab = (tab: string, category?: string) => {
+  // Robust Multi-level Navigation History Stack
+  interface NavHistoryItem {
+    tab: string;
+    category?: string;
+    courseId?: string | null;
+  }
+  const [navHistory, setNavHistory] = useState<NavHistoryItem[]>([]);
+  const [previousNavState, setPreviousNavState] = useState<NavHistoryItem | null>(null);
+  const [learningInitialTab, setLearningInitialTab] = useState<'video' | 'live' | 'assignment' | 'quiz' | 'resources' | 'certificate' | 'notes' | 'ai-tutor'>('video');
+
+  const handleSetActiveTab = (tab: string, category?: string, pushHistory = true) => {
+    if (tab === activeTab && (!category || category === marketplaceCategory)) {
+      return;
+    }
+
+    if (pushHistory) {
+      setNavHistory(prev => [
+        ...prev.slice(-15), // keep last 15 history steps
+        { tab: activeTab, category: marketplaceCategory, courseId: learningCourseId }
+      ]);
+    }
+
     if (tab === 'marketplace') {
       setMarketplaceCategory(category || 'All');
     }
     setActiveTab(tab);
   };
-  const [learningCourseId, setLearningCourseId] = useState<string | null>(null);
-  const [activeCertificateCode, setActiveCertificateCode] = useState<string | null>(null);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const handleStartLearning = (
+    courseId: string,
+    tabMode: 'video' | 'live' | 'assignment' | 'quiz' | 'resources' | 'certificate' | 'notes' | 'ai-tutor' = 'video'
+  ) => {
+    // Record exactly where the student came from
+    const originTab = activeTab !== 'learning' ? activeTab : 'student-dashboard';
+    setPreviousNavState({
+      tab: originTab,
+      category: marketplaceCategory
+    });
+    setNavHistory(prev => [
+      ...prev.slice(-15),
+      { tab: originTab, category: marketplaceCategory }
+    ]);
+    setLearningInitialTab(tabMode);
+    setLearningCourseId(courseId);
+    setActiveTab('learning');
+  };
+
+  // Comprehensive Universal Back Button Handler
+  const handleGoBack = () => {
+    // 1. Close Certificate Modal if open
+    if (activeCertificateCode) {
+      setActiveCertificateCode(null);
+      return;
+    }
+
+    // 2. Close Course Detail Modal if open
+    if (selectedCourseId) {
+      setSelectedCourseId(null);
+      return;
+    }
+
+    // 3. If in Classroom / Learning mode, return to origin page
+    if (activeTab === 'learning' || learningCourseId) {
+      setLearningCourseId(null);
+      if (previousNavState && previousNavState.tab && previousNavState.tab !== 'learning') {
+        if (previousNavState.category) {
+          setMarketplaceCategory(previousNavState.category);
+        }
+        setActiveTab(previousNavState.tab);
+        return;
+      }
+      if (navHistory.length > 0) {
+        const last = navHistory[navHistory.length - 1];
+        setNavHistory(prev => prev.slice(0, -1));
+        if (last.category) setMarketplaceCategory(last.category);
+        setActiveTab(last.tab || (currentUser ? 'student-dashboard' : 'home'));
+        return;
+      }
+      setActiveTab(currentUser ? 'student-dashboard' : 'home');
+      return;
+    }
+
+    // 4. Pop from Navigation History Stack
+    if (navHistory.length > 0) {
+      const last = navHistory[navHistory.length - 1];
+      setNavHistory(prev => prev.slice(0, -1));
+      if (last.category) {
+        setMarketplaceCategory(last.category);
+      }
+      setActiveTab(last.tab);
+      return;
+    }
+
+    // 5. Default fallback to home or student-dashboard
+    if (activeTab !== 'home') {
+      setActiveTab(currentUser ? 'student-dashboard' : 'home');
+    }
+  };
+
+  // Listen to browser / device back button
+  useEffect(() => {
+    const handlePopState = () => {
+      handleGoBack();
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navHistory, activeTab, learningCourseId, selectedCourseId, activeCertificateCode, previousNavState]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -120,17 +221,13 @@ const MainAppContent: React.FC = () => {
     setSelectedCourseId(course.id);
   };
 
-  const handleStartLearning = (courseId: string) => {
-    setLearningCourseId(courseId);
-    setActiveTab('learning');
-  };
-
   // If in learning classroom mode, render full-screen LMS
   if (activeTab === 'learning' && learningCourseId) {
     return (
       <CourseLearningPage
         courseId={learningCourseId}
-        onBack={() => setActiveTab('customer-dashboard')}
+        initialTab={learningInitialTab}
+        onBack={handleGoBack}
         onViewCertificate={(code) => setActiveCertificateCode(code)}
       />
     );
@@ -218,7 +315,7 @@ const MainAppContent: React.FC = () => {
 
         {/* VIEW 6: CERTIFICATE VERIFICATION PORTAL */}
         {(activeTab === 'verify' || activeTab === 'verify-cert') && (
-          <CertificateVerifyPage />
+          <CertificateVerifyPage onBack={handleGoBack} />
         )}
 
         {/* VIEW 7: ROLE-SPECIFIC DASHBOARDS */}

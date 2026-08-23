@@ -185,7 +185,7 @@ interface MarketplaceSectionProps {
   activeTab?: string;
   openAuthModal?: () => void;
   initialCategory?: string;
-  onStartLearning?: (courseId: string) => void;
+  onStartLearning?: (courseId: string, tabMode?: any) => void;
 }
 
 export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiveTab, activeTab = 'marketplace', openAuthModal, initialCategory, onStartLearning }) => {
@@ -598,7 +598,51 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
   const [isFilterBarVisible, setIsFilterBarVisible] = useState(true);
   const [isMobileCatSheetOpen, setIsMobileCatSheetOpen] = useState(false);
   const [isMobileFilterSheetOpen, setIsMobileFilterSheetOpen] = useState(false);
-  const [activeMarketplaceCourseModal, setActiveMarketplaceCourseModal] = useState<{ courseTitle: string; featureType: 'video' | 'certificate' | 'source_code' | 'live_class' | 'quiz' | 'qna'; featureTitle: string } | null>(null);
+
+  // Dynamic Live Class Schedule State per course
+  const [courseLiveSchedules, setCourseLiveSchedules] = useState<{ [id: string]: string }>({
+    'course-mern-pro': 'আজ: রাত ৯টায়',
+    'course-python-ai': 'আগামীকাল রাত ৮টায়',
+    'course-flutter-app': 'প্রতি শনি-বুধ রাত ৯টায়'
+  });
+  const [editingLiveScheduleCourseId, setEditingLiveScheduleCourseId] = useState<string | null>(null);
+  const [tempLiveScheduleText, setTempLiveScheduleText] = useState<string>('');
+  const [activeMarketplaceCourseModal, setActiveMarketplaceCourseModal] = useState<{
+    courseTitle: string;
+    courseId?: string;
+    coverImage?: string;
+    instructor?: string;
+    instructorRole?: string;
+    batch?: string;
+    badge?: string;
+    progress?: number;
+    completedLessons?: number;
+    totalLessons?: number;
+    activeLessonIndex?: number;
+    activeLessonTitle?: string;
+    featureType: 'video' | 'certificate' | 'source_code' | 'live_class' | 'quiz' | 'qna' | 'syllabus' | 'assignment';
+    featureTitle: string;
+  } | null>(null);
+
+  // Dedicated Course Learning Studio States
+  const [courseIsPlaying, setCourseIsPlaying] = useState(false);
+  const [coursePlaybackSpeed, setCoursePlaybackSpeed] = useState<number>(1);
+  const [activeCourseLessonNumber, setActiveCourseLessonNumber] = useState<number>(17);
+  const [courseCompletedLessonsMap, setCourseCompletedLessonsMap] = useState<{ [key: string]: boolean }>({
+    '1': true, '2': true, '3': true, '4': true, '5': true, '6': true, '7': true, '8': true, '9': true, '10': true, '11': true, '12': true, '13': true, '14': true, '15': true, '16': true
+  });
+  const [aiTutorInput, setAiTutorInput] = useState('');
+  const [aiTutorMessages, setAiTutorMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
+    { sender: 'ai', text: 'স্বাগতম! আমি আপনার AI লার্নিং টিউটর। এই কোর্সের যেকোনো কোডিং, ডেবক্স বা টেকনিক্যাল সমস্যা নিয়ে প্রশ্ন করতে পারেন।' }
+  ]);
+  const [isAiTutorThinking, setIsAiTutorThinking] = useState(false);
+  const [quizSelectedOption, setQuizSelectedOption] = useState<number | null>(0);
+  const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
+  const [assignmentRepoLink, setAssignmentRepoLink] = useState<string>('');
+  const [assignmentNotes, setAssignmentNotes] = useState<string>('');
+  const [assignmentSubmittedMap, setAssignmentSubmittedMap] = useState<{ [key: string]: boolean }>({
+    'asg-1': true
+  });
 
   const getTimeAgoBengali = (dateString?: string) => {
     if (!dateString) return 'এখনই';
@@ -8935,73 +8979,315 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                         {/* TAB CONTENT 1 SHOWS ORIGINAL COURSES LIST WHEN studentHubActiveTab === 'my-courses' */}
                         {studentHubActiveTab === 'my-courses' && (
                           <>
-                            {/* Interactive Course Feature Modal (when clicked) */}
+                            {/* Comprehensive Interactive Course Learning Studio Modal */}
                             {activeMarketplaceCourseModal && (
-                              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-xl relative animate-in fade-in zoom-in duration-200">
-                                <button
-                                  type="button"
-                                  onClick={() => setActiveMarketplaceCourseModal(null)}
-                                  className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                                <div className="flex items-center gap-2 mb-1 text-[#1DB954]">
-                                  <Sparkles className="w-4 h-4" />
-                                  <h4 className="text-xs font-black uppercase tracking-wider">{activeMarketplaceCourseModal.featureTitle}</h4>
-                                </div>
-                                <p className="text-xs sm:text-sm text-slate-900 dark:text-white font-bold mb-3">{activeMarketplaceCourseModal.courseTitle}</p>
-
-                                {activeMarketplaceCourseModal.featureType === 'video' && (
-                                  <div className="space-y-3">
-                                    <div className="aspect-video w-full rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-4 text-center relative overflow-hidden">
-                                      <div className="w-12 h-12 rounded-full bg-[#1DB954] text-white flex items-center justify-center shadow-lg mb-2">
-                                        <Play className="w-6 h-6 fill-white ml-0.5" />
-                                      </div>
-                                      <p className="text-xs font-bold text-white">Lesson 17: Redux Toolkit State Management & RTK Query</p>
-                                      <p className="text-[10px] text-slate-400 mt-1">Duration: 42 Minutes • HD 1080p Stream</p>
+                              <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-2xl relative animate-in fade-in zoom-in duration-200 space-y-4">
+                                {/* Header with Close & Badge */}
+                                <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+                                  <div className="flex items-center gap-2 text-[#1DB954]">
+                                    <Sparkles className="w-5 h-5" />
+                                    <div>
+                                      <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                        {activeMarketplaceCourseModal.featureTitle}
+                                      </span>
+                                      <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-tight mt-0.5">
+                                        {activeMarketplaceCourseModal.courseTitle}
+                                      </h3>
                                     </div>
-                                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 pt-1">
-                                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">✓ ১৬/২০ লেসন সম্পূর্ণ</span>
-                                      <button onClick={() => alert('পরবর্তী ক্লাসে চলে যাওয়া হচ্ছে...')} className="px-3.5 py-1.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-lg text-xs transition cursor-pointer">
-                                        পরবর্তী লেসন →
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveMarketplaceCourseModal(null)}
+                                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-slate-200 dark:border-slate-700"
+                                      title="কোর্স তালিকায় ফিরে যান"
+                                    >
+                                      <ArrowLeft className="w-3.5 h-3.5" />
+                                      <span>তালিকায় ফিরে যান</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveMarketplaceCourseModal(null)}
+                                      className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 transition cursor-pointer shrink-0"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Main Course Video Player & Cover Header */}
+                                <div className="relative aspect-video sm:aspect-[21/9] w-full rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex flex-col justify-between p-3 sm:p-5 group">
+                                  <img
+                                    src={activeMarketplaceCourseModal.coverImage || 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=1200&q=80'}
+                                    alt={activeMarketplaceCourseModal.courseTitle}
+                                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${courseIsPlaying ? 'opacity-30' : 'opacity-65'}`}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/30" />
+
+                                  {/* Top Overlaid Tags */}
+                                  <div className="relative z-10 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-2.5 py-0.5 rounded-full bg-[#1DB954] text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+                                        {activeMarketplaceCourseModal.badge || 'PRO COURSE'}
+                                      </span>
+                                      <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-slate-200 text-[10px] font-bold">
+                                        {activeMarketplaceCourseModal.batch || 'ব্যাচ-০৮ (লাইভ)'}
+                                      </span>
+                                    </div>
+                                    <span className="px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-amber-400 text-[10px] font-bold flex items-center gap-1">
+                                      <Star className="w-3 h-3 fill-amber-400" />
+                                      <span>৪.৯ (৫০০+ রিভিউ)</span>
+                                    </span>
+                                  </div>
+
+                                  {/* Center Play / Pause Controller */}
+                                  <div className="relative z-10 flex flex-col items-center justify-center my-auto text-center space-y-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCourseIsPlaying(!courseIsPlaying)}
+                                      className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#1DB954] hover:bg-emerald-400 text-white flex items-center justify-center shadow-2xl transition transform hover:scale-110 active:scale-95 cursor-pointer"
+                                    >
+                                      {courseIsPlaying ? (
+                                        <div className="flex gap-1">
+                                          <div className="w-1.5 h-6 bg-white rounded-xs" />
+                                          <div className="w-1.5 h-6 bg-white rounded-xs" />
+                                        </div>
+                                      ) : (
+                                        <Play className="w-7 h-7 fill-white ml-1" />
+                                      )}
+                                    </button>
+                                    <div>
+                                      <p className="text-xs sm:text-sm font-black text-white drop-shadow-md">
+                                        লেসন {activeCourseLessonNumber}: {activeMarketplaceCourseModal.activeLessonTitle || 'Redux Toolkit State Management & RTK Query Architecture'}
+                                      </p>
+                                      <p className="text-[10px] sm:text-xs text-slate-300 mt-0.5">
+                                        ইন্সট্রাকটর: {activeMarketplaceCourseModal.instructor || 'প্রকৌশলী আল-আমিন'} • HD 1080p Stream
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Bottom Player Controller Bar */}
+                                  <div className="relative z-10 space-y-1.5">
+                                    <div className="flex items-center justify-between text-[10px] sm:text-xs text-white font-mono">
+                                      <span>18:45</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const speeds = [1, 1.25, 1.5, 2];
+                                            const nextIdx = (speeds.indexOf(coursePlaybackSpeed) + 1) % speeds.length;
+                                            setCoursePlaybackSpeed(speeds[nextIdx]);
+                                          }}
+                                          className="px-1.5 py-0.5 bg-black/60 backdrop-blur-md rounded text-[10px] text-emerald-400 font-bold hover:bg-black cursor-pointer"
+                                        >
+                                          {coursePlaybackSpeed}x Speed
+                                        </button>
+                                        <span>42:00</span>
+                                      </div>
+                                    </div>
+                                    <div className="w-full bg-slate-700/80 rounded-full h-1.5 overflow-hidden cursor-pointer">
+                                      <div className="bg-[#1DB954] h-1.5 rounded-full transition-all duration-300" style={{ width: '45%' }} />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Quick Lesson Navigation: Previous & Next with Complete Tick */}
+                                <div className="flex items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (activeCourseLessonNumber > 1) {
+                                        setActiveCourseLessonNumber(activeCourseLessonNumber - 1);
+                                      }
+                                    }}
+                                    disabled={activeCourseLessonNumber <= 1}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                                      activeCourseLessonNumber <= 1
+                                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                                        : 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <ArrowLeft className="w-3.5 h-3.5" />
+                                    <span>পূর্ববর্তী লেসন</span>
+                                  </button>
+
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCourseCompletedLessonsMap(prev => ({
+                                          ...prev,
+                                          [String(activeCourseLessonNumber)]: !prev[String(activeCourseLessonNumber)]
+                                        }));
+                                      }}
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                                        courseCompletedLessonsMap[String(activeCourseLessonNumber)]
+                                          ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                          : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
+                                      }`}
+                                    >
+                                      <CheckCircle2 className={`w-3.5 h-3.5 ${courseCompletedLessonsMap[String(activeCourseLessonNumber)] ? 'text-[#1DB954]' : 'text-slate-400'}`} />
+                                      <span>{courseCompletedLessonsMap[String(activeCourseLessonNumber)] ? 'সম্পন্ন হয়েছে ✓' : 'সম্পন্ন মার্ক করুন'}</span>
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (activeCourseLessonNumber < 20) {
+                                        setCourseCompletedLessonsMap(prev => ({ ...prev, [String(activeCourseLessonNumber)]: true }));
+                                        setActiveCourseLessonNumber(activeCourseLessonNumber + 1);
+                                      } else {
+                                        alert('অভিনন্দন! আপনি কোর্সের সব লেসন সফলভাবে সম্পন্ন করেছেন। সার্টিফিকেট ডাউনলোড করুন!');
+                                      }
+                                    }}
+                                    className="px-3.5 py-1.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                                  >
+                                    <span>পরবর্তী লেসন</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Feature Mode Selector Pills */}
+                                <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5 sm:gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                  {[
+                                    { id: 'video', label: 'ভিডিও ক্লাস', icon: Play },
+                                    { id: 'live_class', label: 'লাইভ ক্লাস', icon: Video },
+                                    { id: 'assignment', label: 'অ্যাসাইনমেন্টস', icon: FileText },
+                                    { id: 'quiz', label: 'মডিউল কুইজ', icon: HelpCircle },
+                                    { id: 'source_code', label: 'সোর্স কোড', icon: Download },
+                                    { id: 'certificate', label: 'সার্টিফিকেট', icon: Award },
+                                    { id: 'qna', label: 'AI টিউটর', icon: Bot }
+                                  ].map((tab) => {
+                                    const IconComp = tab.icon;
+                                    const isActive = activeMarketplaceCourseModal.featureType === tab.id;
+                                    return (
+                                      <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveMarketplaceCourseModal({
+                                          ...activeMarketplaceCourseModal,
+                                          featureType: tab.id as any,
+                                          featureTitle: tab.label
+                                        })}
+                                        className={`p-2 rounded-xl text-xs font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
+                                          isActive
+                                            ? 'bg-[#1DB954] text-white border-[#1DB954] shadow-xs'
+                                            : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                                        }`}
+                                      >
+                                        <IconComp className="w-4 h-4" />
+                                        <span className="text-[10px] truncate leading-none">{tab.label}</span>
                                       </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* FEATURE DETAILS CONTENT VIEW */}
+                                {activeMarketplaceCourseModal.featureType === 'video' && (
+                                  <div className="space-y-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                      <span className="text-slate-800 dark:text-slate-200">কোর্সের সম্পূর্ণ সিলেবাস ও লেসনসমূহ</span>
+                                      <span className="text-[#1DB954] font-black">মোট ২০টি লেসন</span>
+                                    </div>
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                      {[
+                                        { num: 1, title: 'Introduction to Full-Stack Architecture & Environment Setup', dur: '28 Min' },
+                                        { num: 2, title: 'ES6+ JavaScript Modern Paradigms & Async Await Mastery', dur: '35 Min' },
+                                        { num: 3, title: 'React 18 Component Life-Cycles, Hooks & Custom Hooks', dur: '45 Min' },
+                                        { num: 16, title: 'Authentication, JWT Tokens, Cookies & Security Headers', dur: '50 Min' },
+                                        { num: 17, title: 'Redux Toolkit State Engine, Slices & RTK Query APIs', dur: '42 Min' },
+                                        { num: 18, title: 'Payment Gateway Integration (bKash, Nagad & SSLCommerz)', dur: '48 Min' },
+                                        { num: 19, title: 'Realtime WebSockets, Push Notifications & Live Data Sync', dur: '39 Min' },
+                                        { num: 20, title: 'Production Cloud Deployment (Docker, CI/CD & Vercel)', dur: '55 Min' }
+                                      ].map((l) => (
+                                        <div
+                                          key={l.num}
+                                          onClick={() => {
+                                            setActiveCourseLessonNumber(l.num);
+                                            setCourseIsPlaying(true);
+                                          }}
+                                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs transition cursor-pointer ${
+                                            activeCourseLessonNumber === l.num
+                                              ? 'bg-emerald-50 dark:bg-emerald-950/70 border-[#1DB954] text-[#1DB954] font-black'
+                                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            {courseCompletedLessonsMap[String(l.num)] ? (
+                                              <CheckCircle2 className="w-4 h-4 text-[#1DB954] shrink-0" />
+                                            ) : (
+                                              <Play className="w-4 h-4 text-slate-400 shrink-0" />
+                                            )}
+                                            <span className="truncate">লেসন {l.num}: {l.title}</span>
+                                          </div>
+                                          <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">{l.dur}</span>
+                                        </div>
+                                      ))}
                                     </div>
                                   </div>
                                 )}
 
                                 {activeMarketplaceCourseModal.featureType === 'certificate' && (
-                                  <div className="space-y-3 text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#1DB954] flex items-center justify-center mx-auto mb-1 border border-emerald-200 dark:border-emerald-800">
-                                      <Award className="w-6 h-6" />
-                                    </div>
-                                    <h5 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">PTENit Verified Digital Course Certificate</h5>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">শিক্ষার্থী: সোহাগ কাজী (ভেরিফাইড আইডি: PTEN-CERT-8841)</p>
-                                    <div className="pt-2 flex items-center justify-center gap-2">
-                                      <button onClick={() => alert('সার্টিফিকেট PDF ডাউনলোড শুরু হয়েছে!')} className="px-4 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs">
-                                        <Download className="w-4 h-4" />
-                                        <span>PDF ডাউনলোড</span>
-                                      </button>
-                                    </div>
+                                  <div className="space-y-3 text-center bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    {(activeMarketplaceCourseModal.progress || 0) < 100 ? (
+                                      <div className="space-y-3 py-2">
+                                        <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-500 flex items-center justify-center mx-auto mb-1 border border-amber-200 dark:border-amber-800">
+                                          <Clock className="w-6 h-6" />
+                                        </div>
+                                        <h5 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">সার্টিফিকেট এখনও আনলক হয়নি</h5>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                                          কোর্স সম্পন্ন (১০০%) না হওয়া পর্যন্ত সার্টিফিকেট ডাউনলোড করা যাবে না। আপনার বর্তমান অগ্রগতি: <strong className="text-amber-500">{activeMarketplaceCourseModal.progress || 0}%</strong>
+                                        </p>
+                                        <div className="w-full max-w-xs mx-auto bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                          <div
+                                            className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                                            style={{ width: `${activeMarketplaceCourseModal.progress || 0}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#1DB954] flex items-center justify-center mx-auto mb-1 border border-emerald-200 dark:border-emerald-800">
+                                          <Award className="w-6 h-6" />
+                                        </div>
+                                        <h5 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">PTENit Verified Digital Course Certificate</h5>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">শিক্ষার্থী: সোহাগ কাজী • ভেরিফাইড সার্টিফিকেট আইডি: PTEN-CERT-8841</p>
+                                        <div className="pt-2 flex items-center justify-center gap-2">
+                                          <button onClick={() => alert('সার্টিফিকেট PDF ডাউনলোড শুরু হয়েছে!')} className="px-4 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs">
+                                            <Download className="w-4 h-4" />
+                                            <span>PDF সার্টিফিকেট ডাউনলোড</span>
+                                          </button>
+                                          <button onClick={() => {
+                                            navigator.clipboard?.writeText('https://ptenit.com/verify/PTEN-CERT-8841');
+                                            alert('ভেরিফিকেশন লিংক কপি হয়েছে!');
+                                          }} className="px-3 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer">
+                                            <Copy className="w-3.5 h-3.5" />
+                                            <span>লিংক কপি</span>
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 )}
 
                                 {activeMarketplaceCourseModal.featureType === 'source_code' && (
-                                  <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                  <div className="space-y-2.5 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs">
+                                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <FileText className="w-4 h-4 text-[#1DB954]" />
-                                        <span className="font-bold text-slate-900 dark:text-white text-[11px]">Complete Source Code (ZIP File)</span>
+                                        <span className="font-bold text-slate-900 dark:text-white text-xs">Full Production Source Code (ZIP File)</span>
                                       </div>
-                                      <button onClick={() => alert('সোর্স কোড জিপ ফাইল ডাউনলোড হচ্ছে...')} className="px-2.5 py-1 bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold rounded-md text-[10px] cursor-pointer">
+                                      <button onClick={() => alert('সোর্স কোড জিপ ফাইল ডাউনলোড হচ্ছে...')} className="px-3 py-1.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-lg text-xs cursor-pointer shadow-xs">
                                         ডাউনলোড (48 MB)
                                       </button>
                                     </div>
-                                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                    <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <Globe className="w-4 h-4 text-[#1DB954]" />
-                                        <span className="font-bold text-slate-900 dark:text-white text-[11px]">Official GitHub Repository</span>
+                                        <span className="font-bold text-slate-900 dark:text-white text-xs">Official GitHub Clean Repository</span>
                                       </div>
-                                      <a href="https://github.com" target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold rounded-md text-[10px] cursor-pointer">
+                                      <a href="https://github.com" target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold rounded-lg text-xs cursor-pointer">
                                         গিটহাব লিংক ↗
                                       </a>
                                     </div>
@@ -9009,97 +9295,243 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                 )}
 
                                 {activeMarketplaceCourseModal.featureType === 'live_class' && (
-                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-center">
+                                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5 text-center">
                                     <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#1DB954] flex items-center justify-center mx-auto">
                                       <Video className="w-5 h-5" />
                                     </div>
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white">লাইভ ডাউট ক্লিয়ারিং সেশন (Google Meet)</p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">সময়: আজ রাত ৯:০০ টা • ইন্সট্রাকটর: প্রকৌশলী আল-আমিন</p>
-                                    <button onClick={() => createGoogleMeetCall('course-live')} className="w-full py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+                                    <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">লাইভ ডাউট ক্লিয়ারিং ও সমস্যা সমাধান সেশন (Google Meet)</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">সময়: আজ রাত ৯:০০ টা • ইন্সট্রাকটর: প্রকৌশলী আল-আমিন</p>
+                                    <button onClick={() => createGoogleMeetCall('course-live')} className="w-full py-2.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs">
                                       <Video className="w-4 h-4" />
                                       <span>লাইভ ক্লাসে জয়েন করুন</span>
                                     </button>
                                   </div>
                                 )}
 
-                                {activeMarketplaceCourseModal.featureType === 'quiz' && (
-                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white">মডিউল কুইজ পরীক্ষা - মডিউল ৪ (Redux & Async Thunks)</p>
-                                    <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg text-[11px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                                      <p className="font-semibold text-slate-900 dark:text-white mb-1.5">প্রশ্ন ১: RTK Query-তে `useQuery` হুক ব্যবহারের প্রধান সুবিধা কোনটি?</p>
-                                      <div className="space-y-1">
-                                        <label className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-800 rounded cursor-pointer hover:bg-slate-100">
-                                          <input type="radio" name="quiz" className="accent-[#1DB954]" defaultChecked />
-                                          <span>অটোমেটিক ক্যাশিং ও রি-ফেচিং সুবিধা প্রদান করে</span>
-                                        </label>
-                                        <label className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-800 rounded cursor-pointer hover:bg-slate-100">
-                                          <input type="radio" name="quiz" />
-                                          <span>শুধু লোকাল স্টোরেজ ডাটা সেভ করে</span>
-                                        </label>
+                                {activeMarketplaceCourseModal.featureType === 'assignment' && (
+                                  <div className="space-y-3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bengali">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-[#1DB954]">
+                                          <FileText className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                          <h5 className="font-black text-slate-900 dark:text-white text-xs sm:text-sm">কোর্স অ্যাসাইনমেন্টস ও প্রজেক্ট টাস্ক</h5>
+                                          <p className="text-[11px] text-slate-500 dark:text-slate-400">ডেডলাইন: আগামী রবিবার রাত ১১:৫৯ মিনিট</p>
+                                        </div>
+                                      </div>
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                        মোট ৩টি অ্যাসাইনমেন্ট
+                                      </span>
+                                    </div>
+
+                                    <div className="space-y-2 pt-1">
+                                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-black text-slate-900 dark:text-white text-xs">অ্যাসাইনমেন্ট ১: ই-কমার্স শপ ড্যাশবোর্ড UI ও স্টেট ম্যানেজমেন্ট</span>
+                                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
+                                            প্রাপ্ত মার্কস: ১০০/১০০ ✓
+                                          </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400">স্ট্যাটাস: চেক করা সম্পন্ন হয়েছে (চমৎকার কোড কোয়ালিটি)</p>
+                                      </div>
+
+                                      <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-black text-slate-900 dark:text-white text-xs">অ্যাসাইনমেন্ট ২: JWT Auth & Protected Routes ব্যাকএন্ড এপিআই</span>
+                                          {assignmentSubmittedMap['asg-2'] ? (
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-md">
+                                              জমা দেওয়া হয়েছে ✓
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md">
+                                              পেন্ডিং (জমা দিন)
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="space-y-2 pt-1">
+                                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                            গিটহাব রিপোজিটরি / লাইভ প্রজেক্ট লিংক:
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={assignmentRepoLink}
+                                            onChange={(e) => setAssignmentRepoLink(e.target.value)}
+                                            placeholder="https://github.com/username/my-project"
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                                          />
+                                          <button
+                                            onClick={() => {
+                                              if (!assignmentRepoLink.trim()) {
+                                                alert('দয়া করে গিটহাব রিপোজিটরি বা প্রজেক্ট লিংক দিন');
+                                                return;
+                                              }
+                                              setAssignmentSubmittedMap(prev => ({ ...prev, 'asg-2': true }));
+                                              alert('অ্যাসাইনমেন্ট ২ সফলভাবে জমা দেওয়া হয়েছে! ইন্সট্রাকটর দ্রুত রিভিউ করবেন।');
+                                            }}
+                                            className="w-full py-2.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs cursor-pointer shadow-xs transition"
+                                          >
+                                            {assignmentSubmittedMap['asg-2'] ? 'পুনরায় আপডেট করে জমা দিন' : 'অ্যাসাইনমেন্ট জমা দিন'}
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
-                                    <button onClick={() => alert('কুইজ উত্তর সাবমিট করা হয়েছে! স্কোর: ১০০%')} className="w-full py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl cursor-pointer">
-                                      উত্তর জমা দিন
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'quiz' && (
+                                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">মডিউল কুইজ পরীক্ষা - মডিউল ৪ (Redux & Async Thunks)</p>
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-xl text-xs text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 space-y-2">
+                                      <p className="font-bold text-slate-900 dark:text-white">প্রশ্ন ১: RTK Query-তে `useQuery` হুক ব্যবহারের প্রধান সুবিধা কোনটি?</p>
+                                      <div className="space-y-1.5">
+                                        {[
+                                          'অটোমেটিক ক্যাশিং, রি-ফেচিং ও লোডিং স্টেট ম্যানেজমেন্ট সুবিধা প্রদান করে',
+                                          'শুধু ব্রাউজারের লোকাল স্টোরেজ ডাটা সংরক্ষণ করে',
+                                          'শুধুমাত্র সিএসএস স্টাইল লোড করার কাজে লাগে'
+                                        ].map((opt, idx) => (
+                                          <label
+                                            key={idx}
+                                            onClick={() => setQuizSelectedOption(idx)}
+                                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition ${
+                                              quizSelectedOption === idx
+                                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-[#1DB954] text-slate-900 dark:text-white font-bold'
+                                                : 'bg-slate-50 dark:bg-slate-800/70 border border-transparent hover:bg-slate-100'
+                                            }`}
+                                          >
+                                            <input type="radio" name="quiz" checked={quizSelectedOption === idx} onChange={() => setQuizSelectedOption(idx)} className="accent-[#1DB954]" />
+                                            <span>{opt}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {quizSubmitted && (
+                                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-2">
+                                        <CheckCircle2 className="w-4 h-4 text-[#1DB954]" />
+                                        <span>সঠিক উত্তর! স্কোর: ১০০% (A+ Grade অর্জিত হয়েছে)</span>
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={() => setQuizSubmitted(true)}
+                                      className="w-full py-2.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition"
+                                    >
+                                      কুইজের উত্তর জমা দিন
                                     </button>
                                   </div>
                                 )}
 
                                 {activeMarketplaceCourseModal.featureType === 'qna' && (
-                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-                                    <p className="text-xs font-bold text-slate-900 dark:text-white">ইন্সট্রাকটরের কাছে সরাসরি প্রশ্ন করুন</p>
-                                    <textarea
-                                      placeholder="আপনার সমস্যা বা প্রশ্ন বিস্তারিত লিখুন..."
-                                      rows={2}
-                                      className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
-                                    />
-                                    <button onClick={() => alert('আপনার প্রশ্ন সফলভাবে সাবমিট হয়েছে। ইন্সট্রাকটর শীঘ্রই উত্তর দিবেন।')} className="w-full py-2 bg-[#1DB954] text-white font-black text-xs rounded-xl cursor-pointer">
-                                      প্রশ্ন পাঠান
-                                    </button>
+                                  <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                      <span className="text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <Bot className="w-4 h-4 text-[#1DB954]" />
+                                        <span>AI লার্নিং টিউটর ও ডাউট সমাধান</span>
+                                      </span>
+                                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">Gemini 2.5 Live</span>
+                                    </div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                      {aiTutorMessages.map((msg, idx) => (
+                                        <div
+                                          key={idx}
+                                          className={`p-2.5 rounded-xl text-xs ${
+                                            msg.sender === 'user'
+                                              ? 'bg-[#1DB954] text-white ml-auto max-w-[85%]'
+                                              : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-800 max-w-[90%]'
+                                          }`}
+                                        >
+                                          {msg.text}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={aiTutorInput}
+                                        onChange={(e) => setAiTutorInput(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && aiTutorInput.trim()) {
+                                            const query = aiTutorInput.trim();
+                                            setAiTutorMessages(prev => [...prev, { sender: 'user', text: query }]);
+                                            setAiTutorInput('');
+                                            setIsAiTutorThinking(true);
+                                            setTimeout(() => {
+                                              setAiTutorMessages(prev => [
+                                                ...prev,
+                                                { sender: 'ai', text: `আপনার প্রশ্ন "${query}" এর চমৎকার ব্যাখ্যা: Redux Toolkit-এ createAsyncThunk ও createSlice ব্যবহার করে সহজেই ব্যাকএন্ড API হ্যান্ডেল করা যায় এবং builder.addCase মেথডের সাহায্যে pending, fulfilled ও rejected স্ট্যাটাস কন্ট্রোল করা হয়।` }
+                                              ]);
+                                              setIsAiTutorThinking(false);
+                                            }, 700);
+                                          }
+                                        }}
+                                        placeholder="কোর্সের যে কোন কোড বা প্রশ্ন লিখুন..."
+                                        className="flex-1 p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                                      />
+                                      <button
+                                        onClick={() => {
+                                          if (!aiTutorInput.trim()) return;
+                                          const query = aiTutorInput.trim();
+                                          setAiTutorMessages(prev => [...prev, { sender: 'user', text: query }]);
+                                          setAiTutorInput('');
+                                          setIsAiTutorThinking(true);
+                                          setTimeout(() => {
+                                            setAiTutorMessages(prev => [
+                                              ...prev,
+                                              { sender: 'ai', text: `আপনার প্রশ্ন "${query}" এর ব্যাখ্যা: Redux Toolkit এ ক্যাশিং এবং ডেটা ফেচিং এর জন্য RTK Query আদর্শ সমাধান। এটি কোড সাইজ ছোট করে এবং স্টেট সিঙ্ক স্বয়ংক্রিয় রাখে।` }
+                                            ]);
+                                            setIsAiTutorThinking(false);
+                                          }, 700);
+                                        }}
+                                        className="px-4 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl cursor-pointer"
+                                      >
+                                        পাঠান
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
                             )}
 
-                            {/* Clean, Refined Course Cards List */}
+                            {/* Clean Course Cards List - PTEN IT Styled */}
                             <div className="space-y-4">
                               {[
                                 {
                                   id: 'course-mern-pro',
                                   title: 'Full-Stack MERN & Next.js Pro Web Development',
+                                  coverImage: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80',
                                   instructor: 'প্রকৌশলী আল-আমিন',
                                   instructorRole: 'Lead Full-Stack Architect',
                                   batch: 'ব্যাচ-০৮ (লাইভ)',
                                   progress: 80,
                                   completedLessons: 16,
                                   totalLessons: 20,
-                                  badge: 'MERN Pro',
-                                  nextLessonTitle: 'Lesson 17: Redux Toolkit State Engine & RTK Query',
+                                  badge: 'MERN Stack',
                                   enrolledDate: '১০ জুলাই ২০২৬'
                                 },
                                 {
                                   id: 'course-python-ai',
                                   title: 'Python, Django & Artificial Intelligence Masterclass',
+                                  coverImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
                                   instructor: 'Shahinur Rahman',
                                   instructorRole: 'AI & Data Science Specialist',
                                   batch: 'ব্যাচ-০৫ (AI স্পেশাল)',
                                   progress: 45,
                                   completedLessons: 9,
                                   totalLessons: 20,
-                                  badge: 'AI & Django',
-                                  nextLessonTitle: 'Lesson 10: Building Custom Neural Networks & PyTorch',
+                                  badge: 'Python AI',
                                   enrolledDate: '১৫ জুলাই ২০২৬'
                                 },
                                 {
                                   id: 'course-flutter-app',
                                   title: 'Mobile App Dev with React Native & Flutter',
+                                  coverImage: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=80',
                                   instructor: 'Zubair Hossain',
                                   instructorRole: 'Senior Mobile App Engineer',
                                   batch: 'ব্যাচ-১২ (App Dev)',
                                   progress: 20,
                                   completedLessons: 4,
                                   totalLessons: 20,
-                                  badge: 'App Dev',
-                                  nextLessonTitle: 'Lesson 5: Native Bridges & Camera API',
+                                  badge: 'App Development',
                                   enrolledDate: '০১ আগস্ট ২০২৬'
                                 }
                               ].filter(c => {
@@ -9109,148 +9541,203 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                               }).map((course) => (
                                 <div
                                   key={course.id}
-                                  className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 space-y-4"
+                                  className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 space-y-4 overflow-hidden group"
                                 >
-                                  {/* Card Top Row: Badge, Batch & Enrolled Date */}
-                                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] border border-emerald-200 dark:border-emerald-800/80">
-                                        {course.badge}
-                                      </span>
-                                      <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium text-[11px]">
-                                        {course.batch}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                      <Clock className="w-3.5 h-3.5" />
-                                      <span>এনরোল্ড: {course.enrolledDate}</span>
-                                    </div>
-                                  </div>
+                                  {/* Course Main Cover Photo with Play Action */}
+                                  <div
+                                    onClick={() => {
+                                      if (onStartLearning) {
+                                        onStartLearning(course.id || 'course-mern-pro', 'video');
+                                      } else {
+                                        setActiveMarketplaceCourseModal({
+                                          courseTitle: course.title,
+                                          courseId: course.id,
+                                          coverImage: course.coverImage,
+                                          instructor: course.instructor,
+                                          instructorRole: course.instructorRole,
+                                          batch: course.batch,
+                                          badge: course.badge,
+                                          progress: course.progress,
+                                          completedLessons: course.completedLessons,
+                                          totalLessons: course.totalLessons,
+                                          activeLessonIndex: course.completedLessons + 1,
+                                          activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                          featureType: 'video',
+                                          featureTitle: '🎬 ক্লাস ভিডিও প্লেয়ার'
+                                        });
+                                        setCourseIsPlaying(true);
+                                      }
+                                    }}
+                                    className="relative aspect-video sm:aspect-[21/9] w-full rounded-xl overflow-hidden bg-slate-950 cursor-pointer"
+                                  >
+                                    <img
+                                      src={course.coverImage}
+                                      alt={course.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-85"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
 
-                                  {/* Course Title & Instructor Details */}
-                                  <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-100 dark:bg-slate-800 text-[#1DB954] flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-slate-700/80">
-                                      <BookOpen className="w-5 h-5" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-snug">
-                                        {course.title}
-                                      </h4>
-                                      <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-slate-500 dark:text-slate-400">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-300">
-                                          ইনস্ট্রাকটর: {course.instructor}
+                                    {/* Top Overlay Badges */}
+                                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#1DB954] text-white shadow-sm">
+                                          {course.badge}
                                         </span>
-                                        <span>•</span>
-                                        <span className="text-[11px]">{course.instructorRole}</span>
+                                        <span className="px-2.5 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white font-medium text-[10px]">
+                                          {course.batch}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 text-[10px] font-bold text-white bg-black/60 backdrop-blur-md px-2.5 py-0.5 rounded-full">
+                                        <Clock className="w-3 h-3 text-[#1DB954]" />
+                                        <span>এনরোল্ড: {course.enrolledDate}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Center Play Button */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#1DB954] text-white flex items-center justify-center shadow-xl group-hover:scale-110 group-active:scale-95 transition">
+                                        <Play className="w-6 h-6 fill-white ml-0.5" />
+                                      </div>
+                                    </div>
+
+                                    {/* Bottom Overlay Info */}
+                                    <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
+                                      <div>
+                                        <span className="text-[11px] text-emerald-400 font-bold">
+                                          ইন্সট্রাকটর: {course.instructor}
+                                        </span>
+                                        <h4 className="text-sm sm:text-base font-black text-white leading-tight drop-shadow-md">
+                                          {course.title}
+                                        </h4>
                                       </div>
                                     </div>
                                   </div>
 
-                                  {/* Progress Section */}
-                                  <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
-                                    <div className="flex items-center justify-between text-xs font-bold">
-                                      <span className="text-slate-700 dark:text-slate-300">কোর্স প্রগ্রেস</span>
-                                      <span className="text-[#1DB954] font-black">
-                                        {course.completedLessons}/{course.totalLessons} লেসন সম্পন্ন ({course.progress}%)
-                                      </span>
-                                    </div>
-
-                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
-                                      <div
-                                        className="bg-[#1DB954] h-2 rounded-full transition-all duration-500"
-                                        style={{ width: `${course.progress}%` }}
-                                      />
-                                    </div>
-
-                                    <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
-                                      <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
-                                        ▶ <strong>পরবর্তী লেসন:</strong> {course.nextLessonTitle}
-                                      </p>
-                                      <button
-                                        onClick={() => setActiveMarketplaceCourseModal({
-                                          courseTitle: course.title,
-                                          featureType: 'video',
-                                          featureTitle: '🎬 ক্লাস ভিডিও দেখা'
-                                        })}
-                                        className="text-[11px] font-black text-[#1DB954] hover:underline shrink-0 cursor-pointer"
-                                      >
-                                        চালু করুন →
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {/* Unified, Clean 6 Feature Action Buttons */}
-                                  <div className="pt-1 grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
+                                  {/* Action Buttons: ক্লাসরুমে প্রবেশ | লাইভ ক্লাস | অ্যাসাইনমেন্ট | সার্টিফিকেট */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                                    {/* Button 1: ক্লাসরুমে প্রবেশ */}
                                     <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'video',
-                                        featureTitle: '🎬 ক্লাস ভিডিও দেখা'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                      type="button"
+                                      onClick={() => {
+                                        if (onStartLearning) {
+                                          onStartLearning(course.id || 'course-mern-pro', 'video');
+                                        } else {
+                                          setActiveMarketplaceCourseModal({
+                                            courseTitle: course.title,
+                                            courseId: course.id,
+                                            coverImage: course.coverImage,
+                                            instructor: course.instructor,
+                                            instructorRole: course.instructorRole,
+                                            batch: course.batch,
+                                            badge: course.badge,
+                                            progress: course.progress,
+                                            completedLessons: course.completedLessons,
+                                            totalLessons: course.totalLessons,
+                                            activeLessonIndex: course.completedLessons + 1,
+                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                            featureType: 'video',
+                                            featureTitle: '🎬 ক্লাস ভিডিও দেখা'
+                                          });
+                                          setCourseIsPlaying(true);
+                                        }
+                                      }}
+                                      className="py-2.5 px-2 rounded-xl bg-[#1DB954] hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-[#1DB954]/20 transition-all cursor-pointer active:scale-95 group"
                                     >
-                                      <Play className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">ক্লাস ভিডিও</span>
+                                      <Play className="w-3.5 h-3.5 fill-white shrink-0 group-hover:scale-110 transition" />
+                                      <span className="truncate">ক্লাসরুমে প্রবেশ</span>
                                     </button>
 
+                                    {/* Button 2: লাইভ ক্লাস */}
                                     <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'certificate',
-                                        featureTitle: '📜 ভেরিফাইড সার্টিফিকেট'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                      type="button"
+                                      onClick={() => {
+                                        if (onStartLearning) {
+                                          onStartLearning(course.id || 'course-mern-pro', 'live');
+                                        } else {
+                                          setActiveMarketplaceCourseModal({
+                                            courseTitle: course.title,
+                                            courseId: course.id,
+                                            coverImage: course.coverImage,
+                                            instructor: course.instructor,
+                                            instructorRole: course.instructorRole,
+                                            batch: course.batch,
+                                            badge: course.badge,
+                                            progress: course.progress,
+                                            completedLessons: course.completedLessons,
+                                            totalLessons: course.totalLessons,
+                                            activeLessonIndex: course.completedLessons + 1,
+                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                            featureType: 'live_class',
+                                            featureTitle: '🎥 লাইভ ডাউট সেশন'
+                                          });
+                                        }
+                                      }}
+                                      className="py-2.5 px-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-red-600 dark:hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 border border-slate-700/80 hover:border-red-500 transition-all cursor-pointer active:scale-95 group"
                                     >
-                                      <Award className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">সার্টিফিকেট</span>
+                                      <Video className="w-3.5 h-3.5 text-red-400 group-hover:text-white shrink-0" />
+                                      <span className="truncate">লাইভ ক্লাস</span>
                                     </button>
 
+                                    {/* Button 3: অ্যাসাইনমেন্ট */}
                                     <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'source_code',
-                                        featureTitle: '📂 সোর্স কোড ও নোটস'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                      type="button"
+                                      onClick={() => {
+                                        if (onStartLearning) {
+                                          onStartLearning(course.id || 'course-mern-pro', 'assignment');
+                                        } else {
+                                          setActiveMarketplaceCourseModal({
+                                            courseTitle: course.title,
+                                            courseId: course.id,
+                                            coverImage: course.coverImage,
+                                            instructor: course.instructor,
+                                            instructorRole: course.instructorRole,
+                                            batch: course.batch,
+                                            badge: course.badge,
+                                            progress: course.progress,
+                                            completedLessons: course.completedLessons,
+                                            totalLessons: course.totalLessons,
+                                            activeLessonIndex: course.completedLessons + 1,
+                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                            featureType: 'assignment',
+                                            featureTitle: '📝 কোর্স অ্যাসাইনমেন্টস'
+                                          });
+                                        }
+                                      }}
+                                      className="py-2.5 px-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-amber-500 hover:text-white text-slate-800 dark:text-slate-100 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95 group"
                                     >
-                                      <Download className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">সোর্স কোড</span>
+                                      <FileText className="w-3.5 h-3.5 text-amber-500 group-hover:text-white shrink-0" />
+                                      <span className="truncate">অ্যাসাইনমেন্ট</span>
                                     </button>
 
+                                    {/* Button 4: সার্টিফিকেট (লক/আনলক লজিকসহ) */}
                                     <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'live_class',
-                                        featureTitle: '🎥 লাইভ ডাউট সেশন'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                      type="button"
+                                      onClick={() => {
+                                        if (onStartLearning) {
+                                          onStartLearning(course.id || 'course-mern-pro', 'certificate');
+                                        } else {
+                                          setActiveMarketplaceCourseModal({
+                                            courseTitle: course.title,
+                                            courseId: course.id,
+                                            coverImage: course.coverImage,
+                                            instructor: course.instructor,
+                                            instructorRole: course.instructorRole,
+                                            batch: course.batch,
+                                            badge: course.badge,
+                                            progress: course.progress,
+                                            completedLessons: course.completedLessons,
+                                            totalLessons: course.totalLessons,
+                                            activeLessonIndex: course.completedLessons + 1,
+                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                            featureType: 'certificate',
+                                            featureTitle: '🏆 সার্টিফিকেট ভিউ'
+                                          });
+                                        }
+                                      }}
+                                      className="py-2.5 px-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-600 hover:text-white text-purple-800 dark:text-purple-300 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-purple-200 dark:border-purple-800/70 transition-all cursor-pointer active:scale-95 group"
                                     >
-                                      <Video className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">লাইভ ক্লাস</span>
-                                    </button>
-
-                                    <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'quiz',
-                                        featureTitle: '📝 কুইজ ও পরীক্ষা'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
-                                    >
-                                      <HelpCircle className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">মডিউল কুইজ</span>
-                                    </button>
-
-                                    <button
-                                      onClick={() => setActiveMarketplaceCourseModal({
-                                        courseTitle: course.title,
-                                        featureType: 'qna',
-                                        featureTitle: '💬 ইন্সট্রাকটর প্রশ্নাবলি'
-                                      })}
-                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
-                                    >
-                                      <MessageSquare className="w-4 h-4 text-[#1DB954]" />
-                                      <span className="text-[10px] font-bold leading-none">প্রশ্ন করুন</span>
+                                      <Award className="w-3.5 h-3.5 text-purple-500 group-hover:text-white shrink-0" />
+                                      <span className="truncate">সার্টিফিকেট</span>
                                     </button>
                                   </div>
                                 </div>
@@ -13239,7 +13726,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     অর্ডারকৃত গিগ প্যাকেজ
                   </span>
                   <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-                    {detailsModalOrder.packageName || detailsModalOrder.packageTier || 'প্রিমিয়াম অল-ইন-ওয়ান প্যাকেজ (Premium Package)'}
+                    {detailsModalOrder.packageName || detailsModalOrder.packageTier || 'প্রিমিয়াম অল-ইন-ওয়ান প্যাকেজ'}
                   </h3>
                 </div>
                 <div className="text-right">

@@ -153,6 +153,8 @@ export interface Course {
   acceptedAt?: string;
   level?: 'basic' | 'advanced' | 'professional' | 'live_batch';
   isPublicOffer?: boolean;
+  liveSchedule?: string;
+  batch?: string;
 }
 
 export interface Service {
