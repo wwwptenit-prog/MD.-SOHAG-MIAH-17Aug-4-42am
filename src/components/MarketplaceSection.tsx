@@ -103,6 +103,83 @@ import { CustomerDashboard } from './CustomerDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
 import { MarketplaceMessengerView } from './MarketplaceMessengerView';
 
+const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+function toBengaliOverview(numStr: string): string {
+  return numStr.replace(/\d/g, (d) => bengaliDigits[parseInt(d, 10)]);
+}
+
+function fromBengaliOverview(str: string): string {
+  let res = str;
+  bengaliDigits.forEach((bDigit, idx) => {
+    res = res.replaceAll(bDigit, englishDigits[idx]);
+  });
+  return res;
+}
+
+const AnimatedOverviewCounter: React.FC<{ value: string }> = ({ value }) => {
+  const [displayStr, setDisplayStr] = useState('০');
+
+  useEffect(() => {
+    const isBengaliInput = /[০-৯]/.test(value);
+    const normalizedValue = fromBengaliOverview(value);
+
+    const match = normalizedValue.match(/^([^\d]*)([\d,.]+)(.*)$/);
+    if (!match) {
+      setDisplayStr(value);
+      return;
+    }
+
+    const prefix = match[1] || '';
+    const rawNumStr = match[2].replace(/,/g, '');
+    const targetNum = parseFloat(rawNumStr);
+    const suffix = match[3] || '';
+
+    if (isNaN(targetNum)) {
+      setDisplayStr(value);
+      return;
+    }
+
+    const duration = 2500;
+    let animationFrameId: number;
+    let startTime: number | null = null;
+
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const elapsedTime = currentTime - startTime;
+      const progress = Math.min(elapsedTime / duration, 1);
+
+      // Smooth Ease Out curve
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      const currentNum = Math.floor(easeProgress * targetNum);
+
+      let formattedNum = currentNum.toLocaleString();
+      if (isBengaliInput) {
+        formattedNum = toBengaliOverview(formattedNum);
+      }
+
+      setDisplayStr(`${prefix}${formattedNum}${suffix}`);
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        let finalNum = targetNum.toLocaleString();
+        if (isBengaliInput) finalNum = toBengaliOverview(finalNum);
+        setDisplayStr(`${prefix}${finalNum}${suffix}`);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [value]);
+
+  return <span>{displayStr}</span>;
+};
+
 interface MarketplaceSectionProps {
   setActiveTab?: (tab: string, category?: string) => void;
   activeTab?: string;
@@ -143,6 +220,8 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
     payouts,
     requestTeacherPayout,
     notifications,
+    isNotificationCenterOpen,
+    isMessengerInboxOpen,
     openNotificationCenter,
     markNotificationRead,
     markAllNotificationsRead,
@@ -165,7 +244,8 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
     deleteMarketplaceOrder,
     addCourse,
     acceptCourseOffer,
-    declineCourseOffer
+    declineCourseOffer,
+    createGoogleMeetCall
   } = useData();
 
   const allBuyerOrders = useMemo(() => {
@@ -289,11 +369,15 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
   const updateProfile = updateMarketplaceProfile;
 
   const [activeSubTab, setActiveSubTab] = useState<'gigs' | 'jobs' | 'courses' | 'post-job' | 'my-orders' | 'ptenit-services' | 'overview' | 'my-courses' | 'saved_gigs' | 'settings' | 'messenger'>('overview');
+  const [studentHubActiveTab, setStudentHubActiveTab] = useState<'my-courses' | 'certificates' | 'assignments'>('my-courses');
+  const [orderHubTab, setOrderHubTab] = useState<'overview' | 'orders' | 'courses'>('overview');
   const [overviewInnerTab, setOverviewInnerTab] = useState<'all' | 'courses' | 'orders'>('all');
   const [buyerOrderStatusFilter, setBuyerOrderStatusFilter] = useState<'all' | 'in_progress' | 'in_review' | 'completed' | 'cancelled' | 'public_projects'>('all');
   const [messengerSubTabFilter, setMessengerSubTabFilter] = useState<'all' | 'sellers' | 'online' | 'orders'>('all');
   const [isMessengerSearchActive, setIsMessengerSearchActive] = useState(false);
   const [messengerSearchQuery, setMessengerSearchQuery] = useState('');
+  const [isOrderSearchActive, setIsOrderSearchActive] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
 
   const activeMessengerUser = useMemo(() => {
     if (!activeMessengerConversationId) return null;
@@ -514,6 +598,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
   const [isFilterBarVisible, setIsFilterBarVisible] = useState(true);
   const [isMobileCatSheetOpen, setIsMobileCatSheetOpen] = useState(false);
   const [isMobileFilterSheetOpen, setIsMobileFilterSheetOpen] = useState(false);
+  const [activeMarketplaceCourseModal, setActiveMarketplaceCourseModal] = useState<{ courseTitle: string; featureType: 'video' | 'certificate' | 'source_code' | 'live_class' | 'quiz' | 'qna'; featureTitle: string } | null>(null);
 
   const getTimeAgoBengali = (dateString?: string) => {
     if (!dateString) return 'এখনই';
@@ -2027,7 +2112,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                 <Home className={`w-5 h-5 ${activeSubTab === 'gigs' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen && (activeTab === 'marketplace' || !activeTab) ? 'text-[#1DB954]' : 'text-white'}`} />
               </button>
 
-              {/* 2. 🛍️ Order */}
+              {/* 2. 🛍️ Order & Courses */}
               <button
                 type="button"
                 onClick={() => {
@@ -2043,14 +2128,14 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                  activeSubTab === 'my-orders' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                  (activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
                 }`}
-                title="আমার ক্রয়কৃত প্রজেক্ট ও সার্ভিসসমূহ"
+                title="আমার ক্রয়কৃত প্রজেক্ট ও কোর্সসমূহ"
               >
-                <ShoppingBag className={`w-5 h-5 ${activeSubTab === 'my-orders' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
+                <ShoppingBag className={`w-5 h-5 ${(activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
               </button>
 
-              {/* 3. 📚 Course */}
+              {/* 3. ✉️ Messenger */}
               <button
                 type="button"
                 onClick={() => {
@@ -2060,36 +2145,22 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   }
                   openMessengerInbox();
                 }}
-                className={`flex-1 flex justify-center items-center py-1.5 transition active:scale-95 cursor-pointer ${
-                  activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
+                  isMessengerInboxOpen ? 'text-[#1DB954]' : 'text-white hover:text-[#1DB954]'
                 }`}
-                title="আমার কোর্সসমূহ ও লার্নিং ফিচারস"
-              >
-                <BookOpen className={`w-5 h-5 ${activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
-              </button>
-
-              {/* 4. ✉️ Messenger */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!currentUser) {
-                    if (openAuthModal) openAuthModal();
-                    return;
-                  }
-                  openMessengerInbox();
-                }}
-                className="flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer text-white hover:text-[#1DB954]"
                 title="মেসেঞ্জার"
               >
-                <Mail className="w-5 h-5 text-white" />
-                {currentUser && directMessages.filter(m => !m.read).length > 0 && (
+                <Mail className={`w-5 h-5 ${isMessengerInboxOpen ? 'text-[#1DB954] stroke-[2.5]' : 'text-white'}`} />
+                {(directMessages && directMessages.length > 0) && (
                   <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-slate-950 text-[9px] font-black flex items-center justify-center shadow-xs">
-                    {directMessages.filter(m => !m.read).length}
+                    {directMessages.filter(m => !m.read).length > 0 
+                      ? directMessages.filter(m => !m.read).length 
+                      : directMessages.length}
                   </span>
                 )}
               </button>
 
-              {/* 5. 🔔 Notification */}
+              {/* 4. 🔔 Notification */}
               <button
                 type="button"
                 onClick={() => {
@@ -2099,18 +2170,22 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   }
                   openNotificationCenter();
                 }}
-                className="flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer text-white hover:text-[#1DB954]"
+                className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
+                  isNotificationCenterOpen ? 'text-[#1DB954]' : 'text-white hover:text-[#1DB954]'
+                }`}
                 title="নোটিফিকেশন"
               >
-                <Bell className="w-5 h-5 text-white" />
-                {currentUser && notifications.filter(n => !n.read).length > 0 && (
+                <Bell className={`w-5 h-5 ${isNotificationCenterOpen ? 'text-[#1DB954] stroke-[2.5]' : 'text-white'}`} />
+                {(notifications && notifications.length > 0) && (
                   <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
-                    {notifications.filter(n => !n.read).length}
+                    {notifications.filter(n => !n.read).length > 0 
+                      ? notifications.filter(n => !n.read).length 
+                      : notifications.length}
                   </span>
                 )}
               </button>
 
-              {/* 6. ❤️ Saved / Favorites */}
+              {/* 5. ❤️ Saved / Favorites */}
               <button
                 type="button"
                 onClick={() => {
@@ -2139,45 +2214,90 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
               </button>
             </div>
 
-            {/* ATTACHED MOBILE SUB-BAR FOR ORDER VIEW (FIXED WITH TOPBAR) */}
-            {activeSubTab === 'my-orders' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen && (
-              <div className="w-full font-bengali bg-[#0B132B] pt-0.5 pb-1">
-                <div className="grid grid-cols-5 gap-1 w-full px-1 items-center">
-                  {[
-                    { id: 'all', label: 'সকল', count: allBuyerOrders.length, activeBg: 'bg-blue-600 text-white font-bold' },
-                    { id: 'in_progress', label: 'চলমান', count: allBuyerOrders.filter(o => o.status === 'in_progress' && (!o.isPublicOffer || (o.sellerId && o.sellerId !== 'pending_expert' && o.sellerId !== 'ptenit-agency'))).length, activeBg: 'bg-[#1DB954] text-white font-bold' },
-                    { id: 'in_review', label: 'রিভিউ', count: allBuyerOrders.filter(o => o.status === 'in_review').length, activeBg: 'bg-purple-600 text-white font-bold' },
-                    { id: 'completed', label: 'সম্পন্ন', count: allBuyerOrders.filter(o => o.status === 'completed').length, activeBg: 'bg-teal-600 text-white font-bold' },
-                  ].map(tab => {
-                    const isSel = buyerOrderStatusFilter === tab.id;
-                    return (
+            {/* ATTACHED UNIFIED ORDERS & COURSES HEADER FOR PHONE VIEW (SAME CLEAN MESSENGER STYLE) */}
+            {(activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && !selectedGig && !isInboxModalOpen && !isNotificationsOpen && (
+              <div className="w-full font-bengali bg-[#0B132B] px-3 py-2 border-t border-slate-800/80">
+                {isOrderSearchActive ? (
+                  <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={orderSearchQuery}
+                        onChange={(e) => setOrderSearchQuery(e.target.value)}
+                        placeholder="অর্ডার বা কোর্স সার্চ করুন..."
+                        autoFocus
+                        className="w-full pl-8 pr-7 py-1 bg-slate-900/90 text-white placeholder-slate-400 border border-slate-700/80 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                      />
+                      {orderSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setOrderSearchQuery('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPostProjectModalOpen(true)}
+                      className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer shrink-0"
+                      title="সেটিংস ও প্রজেক্ট পোস্ট"
+                    >
+                      <Settings className="w-4.5 h-4.5 text-slate-200" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOrderSearchActive(false);
+                        setOrderSearchQuery('');
+                      }}
+                      className="px-2 py-1 rounded-lg text-slate-300 hover:text-white text-xs font-bold cursor-pointer shrink-0"
+                    >
+                      বাতিল
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
                       <button
-                        key={tab.id}
-                        onClick={() => setBuyerOrderStatusFilter(tab.id as any)}
-                        className={`py-1 px-0.5 sm:px-1 rounded-lg text-xs transition flex items-center justify-center gap-0.5 cursor-pointer text-center w-full ${
-                          isSel ? `${tab.activeBg} shadow-xs` : 'text-slate-300 bg-slate-800/60 hover:bg-slate-800 hover:text-white'
-                        }`}
+                        type="button"
+                        onClick={() => setActiveSubTab('gigs')}
+                        className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        title="ফিরে যান"
                       >
-                        <span className="leading-none whitespace-nowrap">{tab.label}</span>
-                        <span className={`text-[9px] px-1 py-0.1 rounded-full font-bold leading-none ${
-                          isSel ? 'bg-black/25 text-white' : 'bg-slate-700 text-slate-300'
-                        }`}>
-                          {tab.count}
-                        </span>
+                        <ChevronLeft className="w-5 h-5 text-slate-200" />
                       </button>
-                    );
-                  })}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h2 className="text-sm font-black text-white tracking-tight leading-none font-english">Your Orders</h2>
+                          <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
+                        </div>
+                        <p className="text-[10px] font-semibold text-slate-400/90 tracking-wide leading-tight mt-0.5 font-english">PTENit Project & courses</p>
+                      </div>
+                    </div>
 
-                  {/* Green Action Button: পোস্ট করুন */}
-                  <button
-                    type="button"
-                    onClick={() => setIsPostProjectModalOpen(true)}
-                    className="py-1 px-0.5 sm:px-1 bg-[#1DB954] hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-xs transition cursor-pointer active:scale-95 flex items-center justify-center gap-0.5 whitespace-nowrap w-full"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 text-white shrink-0" />
-                    <span>পোস্ট</span>
-                  </button>
-                </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsOrderSearchActive(true)}
+                        className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        title="সার্চ করুন"
+                      >
+                        <Search className="w-4.5 h-4.5 text-slate-200" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsPostProjectModalOpen(true)}
+                        className="p-1.5 rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                        title="সেটিংস ও প্রজেক্ট পোস্ট"
+                      >
+                        <Settings className="w-4.5 h-4.5 text-slate-200" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3037,7 +3157,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
 
       {/* Spacer for fixed topbar on mobile */}
       {!selectedGig && viewMode !== 'selling' && (
-        <div className={`${activeSubTab === 'messenger' ? 'h-[96px]' : 'h-[76px]'} sm:hidden !mt-0`} />
+        <div className={`${(activeSubTab === 'my-orders' || activeSubTab === 'my-courses' || activeSubTab === 'messenger') ? 'h-[102px]' : 'h-[80px]'} sm:hidden !mt-0`} />
       )}
 
       {/* CATEGORY & SERVICE FILTER SUB-NAVBAR (NOT FIXED ON PHONE VIEW, STICKY ON DESKTOP VIEW) */}
@@ -7337,7 +7457,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                         <Home className={`w-5 h-5 ${activeSubTab === 'gigs' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen && (activeTab === 'marketplace' || !activeTab) ? 'text-[#1DB954]' : 'text-white'}`} />
                       </button>
 
-                      {/* 2. 🛍️ Order */}
+                      {/* 2. 🛍️ Order & Courses */}
                       <button
                         type="button"
                         onClick={() => {
@@ -7353,14 +7473,14 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                          activeSubTab === 'my-orders' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                          (activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
                         }`}
-                        title="আমার ক্রয়কৃত প্রজেক্ট ও সার্ভিসসমূহ"
+                        title="আমার ক্রয়কৃত প্রজেক্ট ও কোর্সসমূহ"
                       >
-                        <ShoppingBag className={`w-5 h-5 ${activeSubTab === 'my-orders' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
+                        <ShoppingBag className={`w-5 h-5 ${(activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
                       </button>
 
-                      {/* 3. 📚 Course */}
+                      {/* 3. ✉️ Messenger */}
                       <button
                         type="button"
                         onClick={() => {
@@ -7368,45 +7488,19 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                             if (openAuthModal) openAuthModal();
                             return;
                           }
-                          setSelectedGig(null);
-                          setViewMode('buying');
-                          setActiveSubTab('my-courses');
-                          setIsInboxModalOpen(false);
-                          setIsNotificationsOpen(false);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className={`flex-1 flex justify-center items-center py-1.5 transition active:scale-95 cursor-pointer ${
-                          activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
-                        }`}
-                        title="আমার কোর্সসমূহ"
-                      >
-                        <BookOpen className={`w-5 h-5 ${activeSubTab === 'my-courses' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
-                      </button>
-
-                      {/* 4. ✉️ Messenger */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!currentUser) {
-                            if (openAuthModal) openAuthModal();
-                            return;
-                          }
-                          setSelectedGig(null);
-                          setViewMode('buying');
-                          setActiveSubTab('messenger');
-                          setIsInboxModalOpen(false);
-                          setIsNotificationsOpen(false);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                          openMessengerInbox();
                         }}
                         className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                          activeSubTab === 'messenger' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                          isMessengerInboxOpen ? 'text-[#1DB954]' : 'text-white hover:text-[#1DB954]'
                         }`}
                         title="মেসেঞ্জার"
                       >
-                        <Mail className={`w-5 h-5 ${activeSubTab === 'messenger' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
-                        {currentUser && directMessages.filter(m => !m.read).length > 0 && (
+                        <Mail className={`w-5 h-5 ${isMessengerInboxOpen ? 'text-[#1DB954] stroke-[2.5]' : 'text-white'}`} />
+                        {(directMessages && directMessages.length > 0) && (
                           <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-[#1DB954] text-slate-950 text-[9px] font-black flex items-center justify-center shadow-xs">
-                            {directMessages.filter(m => !m.read).length}
+                            {directMessages.filter(m => !m.read).length > 0 
+                              ? directMessages.filter(m => !m.read).length 
+                              : directMessages.length}
                           </span>
                         )}
                       </button>
@@ -7419,36 +7513,49 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                             if (openAuthModal) openAuthModal();
                             return;
                           }
-                          setIsNotificationsOpen(!isNotificationsOpen);
-                          setIsInboxModalOpen(false);
+                          openNotificationCenter();
                         }}
                         className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
-                          isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                          isNotificationCenterOpen ? 'text-[#1DB954]' : 'text-white hover:text-[#1DB954]'
                         }`}
                         title="নোটিফিকেশন"
                       >
-                        <Bell className={`w-5 h-5 ${isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
-                        {currentUser && notifications.filter(n => !n.read).length > 0 && (
+                        <Bell className={`w-5 h-5 ${isNotificationCenterOpen ? 'text-[#1DB954] stroke-[2.5]' : 'text-white'}`} />
+                        {(notifications && notifications.length > 0) && (
                           <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
-                            {notifications.filter(n => !n.read).length}
+                            {notifications.filter(n => !n.read).length > 0 
+                              ? notifications.filter(n => !n.read).length 
+                              : notifications.length}
                           </span>
                         )}
                       </button>
 
-                      {/* 6. 🌐 PTENit Main Page */}
+                      {/* 6. ❤️ Saved / Favorites */}
                       <button
                         type="button"
                         onClick={() => {
+                          if (!currentUser) {
+                            if (openAuthModal) openAuthModal();
+                            return;
+                          }
+                          setSelectedGig(null);
+                          setViewMode('buying');
+                          setActiveSubTab('saved_gigs');
                           setIsInboxModalOpen(false);
                           setIsNotificationsOpen(false);
-                          if (setActiveTab) setActiveTab('home');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
-                        className={`flex-1 flex justify-center items-center py-1.5 transition active:scale-95 cursor-pointer ${
-                          activeTab === 'home' && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
+                        className={`flex-1 flex justify-center items-center py-1.5 transition relative active:scale-95 cursor-pointer ${
+                          activeSubTab === 'saved_gigs' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'
                         }`}
-                        title="পিটেন আইটি মেইন পেজ"
+                        title="পছন্দের সেভ করা গিগসমূহ"
                       >
-                        <Globe className={`w-5 h-5 ${activeTab === 'home' && !isInboxModalOpen && !isNotificationsOpen ? 'text-[#1DB954]' : 'text-white'}`} />
+                        <Heart className={`w-5 h-5 ${activeSubTab === 'saved_gigs' && !selectedGig && !isInboxModalOpen && !isNotificationsOpen ? 'fill-[#1DB954] text-[#1DB954]' : 'text-white'}`} />
+                        {savedGigIds && savedGigIds.length > 0 && (
+                          <span className="absolute -top-1 right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
+                            {savedGigIds.length}
+                          </span>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -8272,49 +8379,993 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                       </div>
                     )}
 
-                    {/* SUB-TAB 2: MY ORDERS (আমার অর্ডারসমূহ ও লাইভ প্রগ্রেস) */}
-                    {activeSubTab === 'my-orders' && (
-                      <div className="space-y-4 font-bengali">
-                        {/* Header & Filter Row */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs">
-                          <div className="space-y-0.5">
-                            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                              <ShoppingBag className="w-5 h-5 text-[#1DB954]" />
-                              <span>আমার অর্ডারসমূহ ও লাইভ ট্র্যাকিং</span>
-                            </h2>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              এখানে আপনার সমস্ত অর্ডার ও চলমান প্রজেক্টের লাইভ স্ট্যাটাস দেখতে পাবেন
-                            </p>
+                    {/* UNIFIED HUB: MY ORDERS & COURSES (আমার অর্ডার ও কোর্স লার্নিং হাব) */}
+                    {(activeSubTab === 'my-orders' || activeSubTab === 'my-courses') && (
+                      <div className="space-y-4 font-bengali animate-fadeIn pt-1 sm:pt-0">
+                        {/* 3 TABS BAR (ওভারভিউ | প্রজেক্ট অর্ডার | কোর্স ও লার্নিং) */}
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-2 sm:p-2.5 shadow-xs">
+                          <div className="grid grid-cols-3 gap-1 sm:gap-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl">
+                            {/* ১. ওভারভিউ */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderHubTab('overview');
+                                setActiveSubTab('my-orders');
+                              }}
+                              className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 transition cursor-pointer ${
+                                orderHubTab === 'overview'
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                              }`}
+                            >
+                              <LayoutDashboard className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
+                                orderHubTab === 'overview' ? 'text-white' : 'text-slate-500 dark:text-slate-400'
+                              }`} />
+                              <span className="truncate">ওভারভিউ</span>
+                            </button>
+
+                            {/* ২. প্রজেক্ট (সবুজ / Emerald কালার) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderHubTab('orders');
+                                setActiveSubTab('my-orders');
+                              }}
+                              className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 transition cursor-pointer ${
+                                orderHubTab === 'orders' && activeSubTab !== 'my-courses'
+                                  ? 'bg-[#1DB954] text-white shadow-xs'
+                                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10'
+                              }`}
+                            >
+                              <ShoppingBag className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
+                                orderHubTab === 'orders' && activeSubTab !== 'my-courses' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'
+                              }`} />
+                              <span className="truncate sm:hidden">প্রজেক্ট ({allBuyerOrders.length})</span>
+                              <span className="hidden sm:inline truncate">প্রজেক্ট অর্ডার ({allBuyerOrders.length})</span>
+                            </button>
+
+                            {/* ৩. কোর্স (নীল / Blue কালার) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderHubTab('courses');
+                                setActiveSubTab('my-courses');
+                              }}
+                              className={`py-2 px-1 sm:px-3 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center gap-1 sm:gap-1.5 transition cursor-pointer ${
+                                orderHubTab === 'courses' || activeSubTab === 'my-courses'
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'text-blue-600 dark:text-blue-400 hover:bg-blue-500/10'
+                              }`}
+                            >
+                              <BookOpen className={`w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 ${
+                                orderHubTab === 'courses' || activeSubTab === 'my-courses' ? 'text-white' : 'text-blue-600 dark:text-blue-400'
+                              }`} />
+                              <span className="truncate sm:hidden">কোর্স ({userEnrollments.length > 0 ? userEnrollments.length : 3})</span>
+                              <span className="hidden sm:inline truncate">কোর্স ও লার্নিং ({userEnrollments.length > 0 ? userEnrollments.length : 3})</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* VIEW 0: UNIFIED OVERVIEW (ওভারভিউ: একনজরে অর্ডার ও সকল পেমেন্ট হিস্টোরি) */}
+                        {orderHubTab === 'overview' && (
+                          <div className="space-y-4 animate-fadeIn">
+                            {/* 4 Overview Quick Stats Cards (Matching StatsCounter Style & Animation) */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                              {/* 1. মোট প্রজেক্ট */}
+                              <div className="p-3.5 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2.5 sm:gap-3.5 hover:border-sky-500 transition-all transform hover:-translate-y-0.5 shadow-xs">
+                                <div className="p-2.5 sm:p-3.5 rounded-xl bg-sky-500/10 text-sky-500 shrink-0">
+                                  <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg sm:text-2xl font-black font-heading text-slate-900 dark:text-white">
+                                    <AnimatedOverviewCounter value={`${allBuyerOrders.length > 0 ? allBuyerOrders.length : 6}টি`} />
+                                  </h3>
+                                  <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 font-bengali leading-snug">
+                                    মোট প্রজেক্ট
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* 2. এনরোল্ড কোর্স */}
+                              <div className="p-3.5 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2.5 sm:gap-3.5 hover:border-amber-500 transition-all transform hover:-translate-y-0.5 shadow-xs">
+                                <div className="p-2.5 sm:p-3.5 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+                                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg sm:text-2xl font-black font-heading text-slate-900 dark:text-white">
+                                    <AnimatedOverviewCounter value={`${userEnrollments.length > 0 ? userEnrollments.length : 3}টি`} />
+                                  </h3>
+                                  <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 font-bengali leading-snug">
+                                    এনরোল্ড কোর্স
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* 3. মোট পরিশোধিত */}
+                              <div className="p-3.5 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2.5 sm:gap-3.5 hover:border-purple-500 transition-all transform hover:-translate-y-0.5 shadow-xs">
+                                <div className="p-2.5 sm:p-3.5 rounded-xl bg-purple-500/10 text-purple-500 shrink-0">
+                                  <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg sm:text-2xl font-black font-heading text-purple-600 dark:text-purple-400">
+                                    <AnimatedOverviewCounter value={`৳${((allBuyerOrders.reduce((acc, o) => acc + (o.amount || 0), 0) + 10000) || 149500).toLocaleString('bn-BD')}`} />
+                                  </h3>
+                                  <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 font-bengali leading-snug">
+                                    মোট পরিশোধিত
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* 4. এসক্রো ব্যালেন্স */}
+                              <div className="p-3.5 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-2.5 sm:gap-3.5 hover:border-[#1DB954] transition-all transform hover:-translate-y-0.5 shadow-xs">
+                                <div className="p-2.5 sm:p-3.5 rounded-xl bg-[#1DB954]/10 text-[#1DB954] shrink-0">
+                                  <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-lg sm:text-2xl font-black font-heading text-[#1DB954]">
+                                    <AnimatedOverviewCounter value={`৳${((allBuyerOrders.filter(o => o.status !== 'completed').reduce((acc, o) => acc + (o.amount || 0), 0)) || 133000).toLocaleString('bn-BD')}`} />
+                                  </h3>
+                                  <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 font-bengali leading-snug">
+                                    এসক্রো ব্যালেন্স
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* COMPREHENSIVE PAYMENT & TRANSACTION HISTORY (পেমেন্ট বিবরণী) */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
+                              {/* Header & Filter Section */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                                <div className="space-y-0.5">
+                                  <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                                    <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-[#1DB954]" />
+                                    <span>পেমেন্ট হিস্টোরি</span>
+                                  </h3>
+                                  <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
+                                    অর্ডার ও কোর্স লেনদেন বিবরণী
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 scrollbar-none">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOverviewInnerTab('all')}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shrink-0 ${
+                                      overviewInnerTab === 'all'
+                                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-950 shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    সব পেমেন্ট
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setOverviewInnerTab('orders')}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shrink-0 ${
+                                      overviewInnerTab === 'orders'
+                                        ? 'bg-emerald-600 text-white shadow-xs'
+                                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 hover:bg-emerald-100'
+                                    }`}
+                                  >
+                                    প্রজেক্ট
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setOverviewInnerTab('courses')}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-black transition cursor-pointer shrink-0 ${
+                                      overviewInnerTab === 'courses'
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 hover:bg-blue-100'
+                                    }`}
+                                  >
+                                    কোর্স
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Transaction List Items */}
+                              <div className="space-y-2.5">
+                                {(() => {
+                                  // Combined payment records
+                                  const orderTransactions = allBuyerOrders.map((ord, idx) => ({
+                                    id: `TRX-${ord.id ? ord.id.replace('ord-mkt-', '').substring(0, 6).toUpperCase() : `ORD-${idx + 1}`}`,
+                                    invId: `INV-${idx + 101}`,
+                                    type: 'orders',
+                                    typeName: 'সার্ভিস',
+                                    title: ord.title || 'কাস্টম ফুল-স্ট্যাক ওয়েবসাইট ডেভেলপমেন্ট',
+                                    amount: ord.amount || 12000,
+                                    method: idx % 2 === 0 ? 'bKash' : 'Nagad',
+                                    date: ord.createdAt ? new Date(ord.createdAt).toLocaleDateString('bn-BD') : '১৮/০৮/২৬',
+                                    status: ord.status === 'completed' ? 'পরিশোধিত' : 'হোল্ড (এসক্রো)',
+                                    isEscrow: ord.status !== 'completed',
+                                    seller: ord.sellerName || 'এক্সপার্ট'
+                                  }));
+
+                                  const courseTransactions = [
+                                    {
+                                      id: 'TRX-CRS-01',
+                                      invId: 'INV-881',
+                                      type: 'courses',
+                                      typeName: 'কোর্স',
+                                      title: 'Full-Stack Web Development (MERN + AI)',
+                                      amount: 4500,
+                                      method: 'bKash',
+                                      date: '১২/০৮/২৬',
+                                      status: 'পরিশোধিত',
+                                      isEscrow: false,
+                                      seller: 'PTENit Academy'
+                                    },
+                                    {
+                                      id: 'TRX-CRS-02',
+                                      invId: 'INV-712',
+                                      type: 'courses',
+                                      typeName: 'কোর্স',
+                                      title: 'Python Django & AI Backend Engineering',
+                                      amount: 5500,
+                                      method: 'Nagad',
+                                      date: '০৫/০৭/২৬',
+                                      status: 'পরিশোধিত',
+                                      isEscrow: false,
+                                      seller: 'PTENit Academy'
+                                    },
+                                    {
+                                      id: 'TRX-CRS-03',
+                                      invId: 'INV-604',
+                                      type: 'courses',
+                                      typeName: 'কোর্স',
+                                      title: 'Next.js 14 & Tailwind Pro Masterclass',
+                                      amount: 3200,
+                                      method: 'SSLCommerz',
+                                      date: '২৮/০৬/২৬',
+                                      status: 'পরিশোধিত',
+                                      isEscrow: false,
+                                      seller: 'PTENit Academy'
+                                    }
+                                  ];
+
+                                  const combined = overviewInnerTab === 'orders'
+                                    ? orderTransactions
+                                    : overviewInnerTab === 'courses'
+                                    ? courseTransactions
+                                    : [...orderTransactions, ...courseTransactions];
+
+                                  if (combined.length === 0) {
+                                    return (
+                                      <div className="p-6 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl">
+                                        <Receipt className="w-6 h-6 text-slate-400 mx-auto mb-1 opacity-60" />
+                                        <p className="text-xs text-slate-500 font-bold">কোনো পেমেন্ট রেকর্ড নেই</p>
+                                      </div>
+                                    );
+                                  }
+
+                                  return combined.map((trx, idx) => (
+                                    <div
+                                      key={idx}
+                                      className={`p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 transition space-y-1.5 border-l-4 ${
+                                        trx.type === 'orders'
+                                          ? 'border-l-emerald-500 hover:border-emerald-500/80'
+                                          : 'border-l-blue-500 hover:border-blue-500/80'
+                                      }`}
+                                    >
+                                      {/* Row 1: ID, Type, Date, Status, Amount */}
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-mono font-bold">
+                                            {trx.id}
+                                          </span>
+                                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                            trx.type === 'orders'
+                                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                              : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                          }`}>
+                                            {trx.typeName}
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">
+                                            • {trx.date}
+                                          </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className={`px-2 py-0.2 rounded-full text-[9px] font-bold ${
+                                            trx.isEscrow
+                                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                          }`}>
+                                            {trx.status}
+                                          </span>
+                                          <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                                            ৳{trx.amount.toLocaleString('bn-BD')}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Row 2: Title & Details */}
+                                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-xs">
+                                        <div className="min-w-0 pr-1">
+                                          <p className="font-bold text-slate-800 dark:text-slate-200 text-xs truncate">
+                                            {trx.title}
+                                          </p>
+                                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                            {trx.seller} • <span className="text-slate-700 dark:text-slate-300 font-medium">{trx.method}</span>
+                                          </p>
+                                        </div>
+
+                                        {/* Action buttons */}
+                                        <div className="flex items-center gap-1 shrink-0 pt-0.5 sm:pt-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              navigator.clipboard?.writeText(trx.id);
+                                              alert(`আইডি ${trx.id} কপি হয়েছে!`);
+                                            }}
+                                            className="px-2 py-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 rounded-lg text-[10px] font-bold flex items-center gap-1 border border-slate-200 dark:border-slate-600 transition cursor-pointer"
+                                            title="আইডি কপি"
+                                          >
+                                            <Copy className="w-2.5 h-2.5" />
+                                            <span>আইডি</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => alert(`✓ ইনভয়েস (${trx.invId}) PDF ডাউনলোড সম্পন্ন!`)}
+                                            className="px-2.5 py-1 bg-[#1DB954] hover:bg-emerald-500 text-white font-bold rounded-lg text-[10px] flex items-center gap-1 transition cursor-pointer shadow-xs"
+                                          >
+                                            <Download className="w-2.5 h-2.5 text-white" />
+                                            <span>রসিদ</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ));
+                                })()}
+                              </div>
+
+                              {/* Bottom Action / Guarantee Note */}
+                              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300">
+                                <div className="flex items-center gap-1.5">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
+                                  <span>এসক্রো দ্বারা ১০০% সুরক্ষিত লেনদেন।</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => alert('স্টেটমেন্ট রিপোর্ট প্রস্তুত হচ্ছে...')}
+                                  className="font-bold text-[#1DB954] hover:underline whitespace-nowrap cursor-pointer text-left sm:text-right"
+                                >
+                                  স্টেটমেন্ট রিপোর্ট →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* VIEW 1: MY COURSES & ACADEMY FEATURE SUITE */}
+                        {(orderHubTab === 'courses' || activeSubTab === 'my-courses') && (
+                          <div className="space-y-4 animate-fadeIn">
+
+                        {/* EXACT STUDENT HUB MENU BAR (স্টুডেন্ট মেনুবার) MATCHING UPLOADED IMAGE */}
+                        {/* EXACT STUDENT HUB MENU BAR (স্টুডেন্ট মেনুবার) */}
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
+                          {/* Header Line */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 font-black text-slate-800 dark:text-slate-100 text-xs sm:text-sm">
+                              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-[#1DB954] shrink-0" />
+                              <span>স্টুডেন্ট মেনুবার</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedGig(null);
+                                setViewMode('buying');
+                                setActiveSubTab('gigs');
+                                setSelectedCategory('Programming & Tech');
+                              }}
+                              className="text-[#1DB954] hover:text-emerald-400 font-black text-xs sm:text-sm flex items-center transition cursor-pointer hover:underline underline-offset-2 shrink-0"
+                            >
+                              <span>নতুন কোর্স ব্রাউজ →</span>
+                            </button>
                           </div>
 
-                          <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto pb-1 sm:pb-0">
+                          {/* Horizontal Pills Container (Strict 1 Line Grid) */}
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                            {/* 1. কোর্স (Count 3) */}
+                            <button
+                              type="button"
+                              onClick={() => setStudentHubActiveTab('my-courses')}
+                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                                studentHubActiveTab === 'my-courses'
+                                  ? 'bg-[#1DB954] text-white shadow-xs font-black'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                              }`}
+                            >
+                              <span className="truncate">কোর্স</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
+                                studentHubActiveTab === 'my-courses' ? 'bg-black/20 text-white' : 'bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200'
+                              }`}>
+                                3
+                              </span>
+                            </button>
+
+                            {/* 2. সার্টিফিকেট (Count 2) */}
+                            <button
+                              type="button"
+                              onClick={() => setStudentHubActiveTab('certificates')}
+                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                                studentHubActiveTab === 'certificates'
+                                  ? 'bg-blue-600 text-white shadow-xs font-black'
+                                  : 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                              }`}
+                            >
+                              <span className="truncate">সার্টিফিকেট</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
+                                studentHubActiveTab === 'certificates' ? 'bg-black/20 text-white' : 'bg-blue-200/70 dark:bg-blue-900 text-blue-900 dark:text-blue-200'
+                              }`}>
+                                2
+                              </span>
+                            </button>
+
+                            {/* 3. অ্যাসাইনমেন্ট (Count 2) */}
+                            <button
+                              type="button"
+                              onClick={() => setStudentHubActiveTab('assignments')}
+                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                                studentHubActiveTab === 'assignments'
+                                  ? 'bg-purple-600 text-white shadow-xs font-black'
+                                  : 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                              }`}
+                            >
+                              <span className="truncate">অ্যাসাইনমেন্ট</span>
+                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
+                                studentHubActiveTab === 'assignments' ? 'bg-black/20 text-white' : 'bg-purple-200/70 dark:bg-purple-900 text-purple-900 dark:text-purple-200'
+                              }`}>
+                                2
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* TAB CONTENT 2: CERTIFICATES */}
+                        {studentHubActiveTab === 'certificates' && (
+                          <div className="space-y-3">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Award className="w-4 h-4 text-[#1DB954]" />
+                                <span>অর্জিত ভেরিফাইড কোর্স সার্টিফিকেট (২ টি)</span>
+                              </div>
+                              <span className="bg-[#1DB954] text-white font-black px-2 py-0.5 rounded-md text-[10px]">ভেরিফাইড</span>
+                            </div>
+
                             {[
-                              { id: 'all', label: 'সব অর্ডার' },
-                              { id: 'in_progress', label: 'চলমান' },
-                              { id: 'in_review', label: 'রিভিউ' },
-                              { id: 'completed', label: 'সম্পন্ন' },
-                              { id: 'cancelled', label: 'বাতিল' },
-                            ].map((f) => (
-                               <button
-                                 key={f.id}
-                                 onClick={() => setBuyerOrderStatusFilter(f.id as any)}
-                                 className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer ${
-                                   buyerOrderStatusFilter === f.id
-                                     ? 'bg-[#1DB954] text-slate-950 font-black shadow-xs'
-                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                                 }`}
-                               >
-                                 {f.label}
-                               </button>
-                             ))}
-                           </div>
-                         </div>
+                              {
+                                title: 'ফুল স্ট্যাক MERN ডেভেলপমেন্ট মাস্টারক্লাস',
+                                certId: 'CERT-PTEN-MERN-8891',
+                                issueDate: '১৫ আগস্ট ২০২৬',
+                                grade: 'High Distinction (৯৮%)'
+                              },
+                              {
+                                title: 'পাইথন ড্যাঙ্গো (Django) ও AI ব্যাকএন্ড ইঞ্জিনিয়ারিং',
+                                certId: 'CERT-PTEN-PY-4402',
+                                issueDate: '১০ জুলাই ২০২৬',
+                                grade: 'Distinction (৯৪%)'
+                              }
+                            ].map((cert, idx) => (
+                              <div key={idx} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/80">
+                                      {cert.certId}
+                                    </span>
+                                    <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1.5">{cert.title}</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">ইস্যু ডেট: {cert.issueDate} • ফলাফল: {cert.grade}</p>
+                                  </div>
+                                  <Award className="w-7 h-7 text-[#1DB954] shrink-0" />
+                                </div>
+                                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                  <button
+                                    onClick={() => alert(`সার্টিফিকেট ${cert.certId} ডাউনলোড শুরু হয়েছে!`)}
+                                    className="flex-1 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>PDF ডাউনলোড</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(`https://ptenit.com/verify/${cert.certId}`);
+                                      alert('সার্টিফিকেট ভেরিফিকেশন লিংক কপি হয়েছে!');
+                                    }}
+                                    className="py-2 px-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>লিঙ্ক কপি</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* TAB CONTENT 3: ASSIGNMENTS */}
+                        {studentHubActiveTab === 'assignments' && (
+                          <div className="space-y-3">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-[#1DB954]" />
+                                <span>কোর্স অ্যাসাইনমেন্টস ও প্রজেক্ট জমা (২ টি)</span>
+                              </div>
+                              <button
+                                onClick={() => alert('নতুন অ্যাসাইনমেন্ট সাবমিট ফর্ম চালু হচ্ছে...')}
+                                className="bg-[#1DB954] hover:bg-emerald-500 text-white font-black px-2.5 py-1 rounded-lg text-[10px] cursor-pointer shadow-xs transition"
+                              >
+                                + নতুন জমা দিন
+                              </button>
+                            </div>
+
+                            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/80">
+                                    অ্যাসাইনমেন্ট-১ • সম্পন্ন (১০০%)
+                                  </span>
+                                  <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1">E-Commerce REST API & Redux Toolkit Integration</h3>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">প্রাপ্ত নম্বর: ৯৮/১০০ (A+ Grade)</p>
+                                </div>
+                                <CheckCircle className="w-5 h-5 text-[#1DB954] shrink-0" />
+                              </div>
+                              <p className="text-xs bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-slate-700 dark:text-slate-300">
+                                💬 <strong>ইনস্ট্রাকটর ফিডব্যাক:</strong> "চমৎকার ব্যাকএন্ড আর্কিটেকচার এবং ক্লিন রিডাক্স স্লাইস মেথডোলজি ব্যবহার করা হয়েছে।"
+                              </p>
+                            </div>
+
+                            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold border border-slate-200 dark:border-slate-700">
+                                    অ্যাসাইনমেন্ট-২ • রিভিউর অপেক্ষায়
+                                  </span>
+                                  <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1">Real-time Socket.io Chat & Notification Service</h3>
+                                  <p className="text-xs text-slate-500 dark:text-slate-400">জমা দেওয়ার তারিখ: ২০ আগস্ট ২০২৬</p>
+                                </div>
+                                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TAB CONTENT 1 SHOWS ORIGINAL COURSES LIST WHEN studentHubActiveTab === 'my-courses' */}
+                        {studentHubActiveTab === 'my-courses' && (
+                          <>
+                            {/* Interactive Course Feature Modal (when clicked) */}
+                            {activeMarketplaceCourseModal && (
+                              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 shadow-xl relative animate-in fade-in zoom-in duration-200">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveMarketplaceCourseModal(null)}
+                                  className="absolute top-3.5 right-3.5 p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                                <div className="flex items-center gap-2 mb-1 text-[#1DB954]">
+                                  <Sparkles className="w-4 h-4" />
+                                  <h4 className="text-xs font-black uppercase tracking-wider">{activeMarketplaceCourseModal.featureTitle}</h4>
+                                </div>
+                                <p className="text-xs sm:text-sm text-slate-900 dark:text-white font-bold mb-3">{activeMarketplaceCourseModal.courseTitle}</p>
+
+                                {activeMarketplaceCourseModal.featureType === 'video' && (
+                                  <div className="space-y-3">
+                                    <div className="aspect-video w-full rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-4 text-center relative overflow-hidden">
+                                      <div className="w-12 h-12 rounded-full bg-[#1DB954] text-white flex items-center justify-center shadow-lg mb-2">
+                                        <Play className="w-6 h-6 fill-white ml-0.5" />
+                                      </div>
+                                      <p className="text-xs font-bold text-white">Lesson 17: Redux Toolkit State Management & RTK Query</p>
+                                      <p className="text-[10px] text-slate-400 mt-1">Duration: 42 Minutes • HD 1080p Stream</p>
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 pt-1">
+                                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">✓ ১৬/২০ লেসন সম্পূর্ণ</span>
+                                      <button onClick={() => alert('পরবর্তী ক্লাসে চলে যাওয়া হচ্ছে...')} className="px-3.5 py-1.5 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-lg text-xs transition cursor-pointer">
+                                        পরবর্তী লেসন →
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'certificate' && (
+                                  <div className="space-y-3 text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#1DB954] flex items-center justify-center mx-auto mb-1 border border-emerald-200 dark:border-emerald-800">
+                                      <Award className="w-6 h-6" />
+                                    </div>
+                                    <h5 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">PTENit Verified Digital Course Certificate</h5>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">শিক্ষার্থী: সোহাগ কাজী (ভেরিফাইড আইডি: PTEN-CERT-8841)</p>
+                                    <div className="pt-2 flex items-center justify-center gap-2">
+                                      <button onClick={() => alert('সার্টিফিকেট PDF ডাউনলোড শুরু হয়েছে!')} className="px-4 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs">
+                                        <Download className="w-4 h-4" />
+                                        <span>PDF ডাউনলোড</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'source_code' && (
+                                  <div className="space-y-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-[#1DB954]" />
+                                        <span className="font-bold text-slate-900 dark:text-white text-[11px]">Complete Source Code (ZIP File)</span>
+                                      </div>
+                                      <button onClick={() => alert('সোর্স কোড জিপ ফাইল ডাউনলোড হচ্ছে...')} className="px-2.5 py-1 bg-slate-900 dark:bg-white text-white dark:text-slate-950 font-bold rounded-md text-[10px] cursor-pointer">
+                                        ডাউনলোড (48 MB)
+                                      </button>
+                                    </div>
+                                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Globe className="w-4 h-4 text-[#1DB954]" />
+                                        <span className="font-bold text-slate-900 dark:text-white text-[11px]">Official GitHub Repository</span>
+                                      </div>
+                                      <a href="https://github.com" target="_blank" rel="noreferrer" className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold rounded-md text-[10px] cursor-pointer">
+                                        গিটহাব লিংক ↗
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'live_class' && (
+                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2 text-center">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-[#1DB954] flex items-center justify-center mx-auto">
+                                      <Video className="w-5 h-5" />
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">লাইভ ডাউট ক্লিয়ারিং সেশন (Google Meet)</p>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">সময়: আজ রাত ৯:০০ টা • ইন্সট্রাকটর: প্রকৌশলী আল-আমিন</p>
+                                    <button onClick={() => createGoogleMeetCall('course-live')} className="w-full py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+                                      <Video className="w-4 h-4" />
+                                      <span>লাইভ ক্লাসে জয়েন করুন</span>
+                                    </button>
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'quiz' && (
+                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">মডিউল কুইজ পরীক্ষা - মডিউল ৪ (Redux & Async Thunks)</p>
+                                    <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg text-[11px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      <p className="font-semibold text-slate-900 dark:text-white mb-1.5">প্রশ্ন ১: RTK Query-তে `useQuery` হুক ব্যবহারের প্রধান সুবিধা কোনটি?</p>
+                                      <div className="space-y-1">
+                                        <label className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-800 rounded cursor-pointer hover:bg-slate-100">
+                                          <input type="radio" name="quiz" className="accent-[#1DB954]" defaultChecked />
+                                          <span>অটোমেটিক ক্যাশিং ও রি-ফেচিং সুবিধা প্রদান করে</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-800 rounded cursor-pointer hover:bg-slate-100">
+                                          <input type="radio" name="quiz" />
+                                          <span>শুধু লোকাল স্টোরেজ ডাটা সেভ করে</span>
+                                        </label>
+                                      </div>
+                                    </div>
+                                    <button onClick={() => alert('কুইজ উত্তর সাবমিট করা হয়েছে! স্কোর: ১০০%')} className="w-full py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs rounded-xl cursor-pointer">
+                                      উত্তর জমা দিন
+                                    </button>
+                                  </div>
+                                )}
+
+                                {activeMarketplaceCourseModal.featureType === 'qna' && (
+                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white">ইন্সট্রাকটরের কাছে সরাসরি প্রশ্ন করুন</p>
+                                    <textarea
+                                      placeholder="আপনার সমস্যা বা প্রশ্ন বিস্তারিত লিখুন..."
+                                      rows={2}
+                                      className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                                    />
+                                    <button onClick={() => alert('আপনার প্রশ্ন সফলভাবে সাবমিট হয়েছে। ইন্সট্রাকটর শীঘ্রই উত্তর দিবেন।')} className="w-full py-2 bg-[#1DB954] text-white font-black text-xs rounded-xl cursor-pointer">
+                                      প্রশ্ন পাঠান
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Clean, Refined Course Cards List */}
+                            <div className="space-y-4">
+                              {[
+                                {
+                                  id: 'course-mern-pro',
+                                  title: 'Full-Stack MERN & Next.js Pro Web Development',
+                                  instructor: 'প্রকৌশলী আল-আমিন',
+                                  instructorRole: 'Lead Full-Stack Architect',
+                                  batch: 'ব্যাচ-০৮ (লাইভ)',
+                                  progress: 80,
+                                  completedLessons: 16,
+                                  totalLessons: 20,
+                                  badge: 'MERN Pro',
+                                  nextLessonTitle: 'Lesson 17: Redux Toolkit State Engine & RTK Query',
+                                  enrolledDate: '১০ জুলাই ২০২৬'
+                                },
+                                {
+                                  id: 'course-python-ai',
+                                  title: 'Python, Django & Artificial Intelligence Masterclass',
+                                  instructor: 'Shahinur Rahman',
+                                  instructorRole: 'AI & Data Science Specialist',
+                                  batch: 'ব্যাচ-০৫ (AI স্পেশাল)',
+                                  progress: 45,
+                                  completedLessons: 9,
+                                  totalLessons: 20,
+                                  badge: 'AI & Django',
+                                  nextLessonTitle: 'Lesson 10: Building Custom Neural Networks & PyTorch',
+                                  enrolledDate: '১৫ জুলাই ২০২৬'
+                                },
+                                {
+                                  id: 'course-flutter-app',
+                                  title: 'Mobile App Dev with React Native & Flutter',
+                                  instructor: 'Zubair Hossain',
+                                  instructorRole: 'Senior Mobile App Engineer',
+                                  batch: 'ব্যাচ-১২ (App Dev)',
+                                  progress: 20,
+                                  completedLessons: 4,
+                                  totalLessons: 20,
+                                  badge: 'App Dev',
+                                  nextLessonTitle: 'Lesson 5: Native Bridges & Camera API',
+                                  enrolledDate: '০১ আগস্ট ২০২৬'
+                                }
+                              ].filter(c => {
+                                if (!orderSearchQuery) return true;
+                                const q = orderSearchQuery.toLowerCase();
+                                return c.title.toLowerCase().includes(q) || c.instructor.toLowerCase().includes(q) || c.badge.toLowerCase().includes(q);
+                              }).map((course) => (
+                                <div
+                                  key={course.id}
+                                  className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 space-y-4"
+                                >
+                                  {/* Card Top Row: Badge, Batch & Enrolled Date */}
+                                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] border border-emerald-200 dark:border-emerald-800/80">
+                                        {course.badge}
+                                      </span>
+                                      <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium text-[11px]">
+                                        {course.batch}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      <span>এনরোল্ড: {course.enrolledDate}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Course Title & Instructor Details */}
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-100 dark:bg-slate-800 text-[#1DB954] flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-slate-700/80">
+                                      <BookOpen className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-snug">
+                                        {course.title}
+                                      </h4>
+                                      <div className="flex items-center gap-2 mt-1 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+                                        <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                          ইনস্ট্রাকটর: {course.instructor}
+                                        </span>
+                                        <span>•</span>
+                                        <span className="text-[11px]">{course.instructorRole}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Progress Section */}
+                                  <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-2">
+                                    <div className="flex items-center justify-between text-xs font-bold">
+                                      <span className="text-slate-700 dark:text-slate-300">কোর্স প্রগ্রেস</span>
+                                      <span className="text-[#1DB954] font-black">
+                                        {course.completedLessons}/{course.totalLessons} লেসন সম্পন্ন ({course.progress}%)
+                                      </span>
+                                    </div>
+
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                      <div
+                                        className="bg-[#1DB954] h-2 rounded-full transition-all duration-500"
+                                        style={{ width: `${course.progress}%` }}
+                                      />
+                                    </div>
+
+                                    <div className="flex items-center justify-between gap-2 pt-0.5 text-xs">
+                                      <p className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
+                                        ▶ <strong>পরবর্তী লেসন:</strong> {course.nextLessonTitle}
+                                      </p>
+                                      <button
+                                        onClick={() => setActiveMarketplaceCourseModal({
+                                          courseTitle: course.title,
+                                          featureType: 'video',
+                                          featureTitle: '🎬 ক্লাস ভিডিও দেখা'
+                                        })}
+                                        className="text-[11px] font-black text-[#1DB954] hover:underline shrink-0 cursor-pointer"
+                                      >
+                                        চালু করুন →
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Unified, Clean 6 Feature Action Buttons */}
+                                  <div className="pt-1 grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2">
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'video',
+                                        featureTitle: '🎬 ক্লাস ভিডিও দেখা'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <Play className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">ক্লাস ভিডিও</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'certificate',
+                                        featureTitle: '📜 ভেরিফাইড সার্টিফিকেট'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <Award className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">সার্টিফিকেট</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'source_code',
+                                        featureTitle: '📂 সোর্স কোড ও নোটস'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <Download className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">সোর্স কোড</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'live_class',
+                                        featureTitle: '🎥 লাইভ ডাউট সেশন'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <Video className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">লাইভ ক্লাস</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'quiz',
+                                        featureTitle: '📝 কুইজ ও পরীক্ষা'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <HelpCircle className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">মডিউল কুইজ</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => setActiveMarketplaceCourseModal({
+                                        courseTitle: course.title,
+                                        featureType: 'qna',
+                                        featureTitle: '💬 ইন্সট্রাকটর প্রশ্নাবলি'
+                                      })}
+                                      className="p-2 sm:p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-300 dark:hover:border-emerald-800 text-slate-700 dark:text-slate-200 hover:text-[#1DB954] border border-slate-200 dark:border-slate-700/80 transition cursor-pointer flex flex-col items-center justify-center text-center gap-1 active:scale-95"
+                                    >
+                                      <MessageSquare className="w-4 h-4 text-[#1DB954]" />
+                                      <span className="text-[10px] font-bold leading-none">প্রশ্ন করুন</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                  </div>
+                )}
+
+                        {/* VIEW 2: MY ORDERS (আমার অর্ডারসমূহ ও লাইভ প্রগ্রেস) */}
+                        {orderHubTab === 'orders' && activeSubTab !== 'my-courses' && (
+                          <div className="space-y-4 font-bengali animate-fadeIn">
+                            {/* Filter Row */}
+                            <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
+                              {/* Header Line */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 font-black text-slate-800 dark:text-slate-100 text-xs sm:text-sm">
+                                  <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 text-[#1DB954] shrink-0" />
+                                  <span>সার্ভিস অর্ডার</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedGig(null);
+                                    setViewMode('buying');
+                                    setActiveSubTab('gigs');
+                                    setSelectedCategory('all');
+                                  }}
+                                  className="text-[#1DB954] hover:text-emerald-400 font-black text-xs sm:text-sm flex items-center transition cursor-pointer hover:underline underline-offset-2 shrink-0 whitespace-nowrap"
+                                >
+                                  <span>নতুন প্রজেক্ট ব্রাউজ →</span>
+                                </button>
+                              </div>
+
+                              {/* Status Filter Buttons (Strict 1 Line 4-Column Grid with respective colors) */}
+                              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                                {[
+                                  {
+                                    id: 'all',
+                                    label: 'সব',
+                                    count: allBuyerOrders.length,
+                                    activeClass: 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xs font-black',
+                                    inactiveClass: 'bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700',
+                                    badgeActive: 'bg-black/20 dark:bg-slate-900/20 text-white dark:text-slate-900',
+                                    badgeInactive: 'bg-slate-200/80 dark:bg-slate-700 text-slate-800 dark:text-slate-200',
+                                  },
+                                  {
+                                    id: 'in_progress',
+                                    label: 'চলমান',
+                                    count: allBuyerOrders.filter(o => o.status === 'in_progress').length,
+                                    activeClass: 'bg-blue-600 text-white shadow-xs font-black',
+                                    inactiveClass: 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50',
+                                    badgeActive: 'bg-black/20 text-white',
+                                    badgeInactive: 'bg-blue-200/70 dark:bg-blue-900 text-blue-900 dark:text-blue-200',
+                                  },
+                                  {
+                                    id: 'in_review',
+                                    label: 'রিভিউ',
+                                    count: allBuyerOrders.filter(o => o.status === 'in_review').length,
+                                    activeClass: 'bg-amber-500 text-white shadow-xs font-black',
+                                    inactiveClass: 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50',
+                                    badgeActive: 'bg-black/20 text-white',
+                                    badgeInactive: 'bg-amber-200/70 dark:bg-amber-900 text-amber-900 dark:text-amber-200',
+                                  },
+                                  {
+                                    id: 'completed',
+                                    label: 'সম্পন্ন',
+                                    count: allBuyerOrders.filter(o => o.status === 'completed').length,
+                                    activeClass: 'bg-[#1DB954] text-white shadow-xs font-black',
+                                    inactiveClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
+                                    badgeActive: 'bg-black/20 text-white',
+                                    badgeInactive: 'bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200',
+                                  },
+                                ].map((f) => {
+                                  const isActive = buyerOrderStatusFilter === f.id;
+                                  return (
+                                    <button
+                                      key={f.id}
+                                      onClick={() => setBuyerOrderStatusFilter(f.id as any)}
+                                      className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                                        isActive ? f.activeClass : f.inactiveClass
+                                      }`}
+                                    >
+                                      <span className="truncate">{f.label}</span>
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
+                                          isActive ? f.badgeActive : f.badgeInactive
+                                        }`}
+                                      >
+                                        {f.count}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
 
                          {/* Order Cards List */}
                          {(() => {
-                           const filtered = buyerOrderStatusFilter === 'all'
+                           const byStatus = buyerOrderStatusFilter === 'all'
                              ? allBuyerOrders
                              : allBuyerOrders.filter(o => o.status === buyerOrderStatusFilter);
+
+                           const filtered = byStatus.filter(o => {
+                             if (!orderSearchQuery) return true;
+                             const q = orderSearchQuery.toLowerCase();
+                             return (
+                               o.title?.toLowerCase().includes(q) ||
+                               o.category?.toLowerCase().includes(q) ||
+                               o.sellerName?.toLowerCase().includes(q) ||
+                               o.id?.toLowerCase().includes(q)
+                             );
+                           });
 
                            if (filtered.length === 0) {
                              return (
@@ -8362,7 +9413,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                       dotBg: 'bg-[#1DB954]',
                                       textColor: 'text-[#1DB954]',
                                       ping: true,
-                                      btnBg: 'bg-[#1DB954] hover:bg-[#19a34a] text-slate-950',
+                                      btnBg: 'bg-[#1DB954] hover:bg-[#19a34a] text-white',
                                       msgBorder: 'border-[#1DB954] text-[#1DB954]',
                                       progressBg: 'bg-[#1DB954]',
                                     };
@@ -8372,7 +9423,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                       dotBg: 'bg-amber-500',
                                       textColor: 'text-amber-500 dark:text-amber-400',
                                       ping: true,
-                                      btnBg: 'bg-amber-500 hover:bg-amber-600 text-slate-950',
+                                      btnBg: 'bg-amber-500 hover:bg-amber-600 text-white',
                                       msgBorder: 'border-amber-500 text-amber-600 dark:text-amber-400',
                                       progressBg: 'bg-amber-500',
                                     };
@@ -8402,7 +9453,13 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                 return (
                                   <div
                                     key={ord.id}
-                                    className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-sm transition-all font-bengali space-y-2.5"
+                                    className={`bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xs hover:shadow-sm transition-all font-bengali space-y-2.5 border-l-4 ${
+                                      ord.status === 'completed'
+                                        ? 'border-l-blue-500 hover:border-l-blue-600'
+                                        : ord.status === 'in_review'
+                                        ? 'border-l-amber-500 hover:border-l-amber-600'
+                                        : 'border-l-emerald-500 hover:border-l-emerald-600'
+                                    }`}
                                   >
                                     {/* TOP ROW: Order ID (Left) | Project Tag (Text only) + 3 Dots Menu (Right) */}
                                     <div className="flex items-center justify-between gap-2">
@@ -8537,8 +9594,8 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                           onClick={() => setPayReleaseModalOrder(ord)}
                                           className={`flex-1 py-1.5 px-2.5 ${
                                             isWorkFirst
-                                              ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-                                              : 'bg-[#1DB954] hover:bg-[#19a34a] text-slate-950'
+                                              ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                              : 'bg-[#1DB954] hover:bg-[#19a34a] text-white'
                                           } font-bold text-[11px] sm:text-xs rounded-xl transition cursor-pointer flex items-center justify-center gap-1 active:scale-95 shrink-0 shadow-2xs`}
                                         >
                                           <DollarSign className="w-3.5 h-3.5" />
@@ -8610,9 +9667,11 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                       </div>
                     )}
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
+          </div>
+        )}
 
           {/* FIVERR-STYLE MODERN FOOTER */}
           <div className="pt-12 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-8 font-english">
@@ -11593,17 +12652,6 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
           )}
         </button>
 
-        {/* 3. কোর্স (Courses) */}
-        <button
-          type="button"
-          onClick={() => {
-            if (setActiveTab) setActiveTab('courses');
-          }}
-          className="flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer text-slate-400 hover:text-white active:scale-95"
-        >
-          <BookOpen className="w-5 h-5 text-emerald-400" />
-          <span className="text-[10px] font-bold">কোর্স</span>
-        </button>
 
         {/* 4. মেসেঞ্জার (Messenger) */}
         <button
@@ -11639,6 +12687,34 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
           {notifications.filter(n => !n.read).length > 0 && (
             <span className="absolute -top-0.5 right-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
               {notifications.filter(n => !n.read).length}
+            </span>
+          )}
+        </button>
+
+        {/* 6. পছন্দের (Saved) */}
+        <button
+          type="button"
+          onClick={() => {
+            if (!currentUser) {
+              if (openAuthModal) openAuthModal();
+              return;
+            }
+            setSelectedGig(null);
+            setViewMode('buying');
+            setActiveSubTab('saved_gigs');
+            setIsInboxModalOpen(false);
+            setIsNotificationsOpen(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center gap-0.5 py-1 px-2 rounded-xl transition cursor-pointer relative active:scale-95 ${
+            activeSubTab === 'saved_gigs' && !selectedGig ? 'text-[#1DB954] font-black' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Heart className="w-5 h-5 text-rose-400" />
+          <span className="text-[10px] font-bold">পছন্দের</span>
+          {savedGigIds && savedGigIds.length > 0 && (
+            <span className="absolute -top-0.5 right-1 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
+              {savedGigIds.length}
             </span>
           )}
         </button>

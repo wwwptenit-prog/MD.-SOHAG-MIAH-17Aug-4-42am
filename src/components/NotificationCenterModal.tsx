@@ -152,9 +152,9 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                       <h2 className="text-sm sm:text-base font-black text-white tracking-tight leading-none flex items-center gap-1.5">
                         <span>Notifications</span>
                         <span className="w-2 h-2 rounded-full bg-[#1DB954]" />
-                        {unreadCount > 0 && (
-                          <span className="min-w-5 h-5 px-1.5 bg-[#1DB954] text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-xs">
-                            {unreadCount}
+                        {notifications.length > 0 && (
+                          <span className="min-w-5 h-5 px-1.5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0 shadow-xs">
+                            {unreadCount > 0 ? unreadCount : notifications.length}
                           </span>
                         )}
                       </h2>

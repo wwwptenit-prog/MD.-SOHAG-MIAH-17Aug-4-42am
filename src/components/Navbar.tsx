@@ -84,8 +84,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [replyText, setReplyText] = useState<string>('');
   const [replySentSuccess, setReplySentSuccess] = useState<boolean>(false);
 
-  const unreadNavNotifCount = notifications.filter(n => !n.read).length;
-  const unreadMsgCount = directMessages.filter(m => !m.read).length;
+  const unreadNavNotifCount = notifications.filter(n => !n.read).length > 0 
+    ? notifications.filter(n => !n.read).length 
+    : notifications.length;
+  const unreadMsgCount = directMessages.filter(m => !m.read).length > 0 
+    ? directMessages.filter(m => !m.read).length 
+    : directMessages.length;
   
   // Inline Search State
   const [inlineSearchOpen, setInlineSearchOpen] = useState(false);

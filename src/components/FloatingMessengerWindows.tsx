@@ -78,6 +78,7 @@ export const FloatingMessengerWindows: React.FC = () => {
     directMessages,
     openChatWindow,
     isMessengerInboxOpen,
+    initialMessengerTab,
     closeMessengerInbox,
     activeMessengerConversationId,
     setActiveMessengerConversationId,
@@ -133,9 +134,9 @@ export const FloatingMessengerWindows: React.FC = () => {
     if (isNotificationCenterOpen) {
       setActiveTopTab('notifications');
     } else if (isMessengerInboxOpen) {
-      setActiveTopTab('messages');
+      setActiveTopTab(initialMessengerTab || 'messages');
     }
-  }, [isNotificationCenterOpen, isMessengerInboxOpen]);
+  }, [isNotificationCenterOpen, isMessengerInboxOpen, initialMessengerTab]);
 
   // Synchronize selected conversation ID whenever messenger opens or activeMessengerConversationId changes
   useEffect(() => {

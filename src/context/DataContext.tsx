@@ -77,7 +77,8 @@ interface DataContextType {
   setActiveMessengerConversationId: (id: string | null) => void;
   isMessengerInboxOpen: boolean;
   setIsMessengerInboxOpen: (open: boolean) => void;
-  openMessengerInbox: (conversationId?: string) => void;
+  initialMessengerTab: 'messages' | 'notifications' | 'courses';
+  openMessengerInbox: (conversationId?: string, initialTab?: 'messages' | 'notifications' | 'courses') => void;
   closeMessengerInbox: () => void;
   assignments: Assignment[];
   submissions: AssignmentSubmission[];
@@ -594,6 +595,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeChatWindows, setActiveChatWindows] = useState<ActiveChatWindow[]>([]);
   const [activeMessengerConversationId, setActiveMessengerConversationId] = useState<string | null>(null);
   const [isMessengerInboxOpen, setIsMessengerInboxOpen] = useState(false);
+  const [initialMessengerTab, setInitialMessengerTab] = useState<'messages' | 'notifications' | 'courses'>('messages');
 
   const [assignments, setAssignments] = useState<Assignment[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_assignments`);
@@ -1591,7 +1593,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveChatWindows(prev => prev.filter(w => w.id !== id));
   };
 
-  const openMessengerInbox = (conversationId?: string) => {
+  const openMessengerInbox = (conversationId?: string, initialTab: 'messages' | 'notifications' | 'courses' = 'messages') => {
+    setInitialMessengerTab(initialTab);
     if (conversationId) {
       setActiveMessengerConversationId(conversationId);
       // Find or open this conversation
@@ -2363,6 +2366,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveMessengerConversationId,
         isMessengerInboxOpen,
         setIsMessengerInboxOpen,
+        initialMessengerTab,
         openMessengerInbox,
         closeMessengerInbox,
         isNotificationCenterOpen,
