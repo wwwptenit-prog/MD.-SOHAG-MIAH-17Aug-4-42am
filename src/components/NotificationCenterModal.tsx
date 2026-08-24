@@ -70,13 +70,36 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     playAppSound('notification');
     closeNotificationCenter();
 
+    const notifTitle = (notif.title || '').toLowerCase();
+    const notifMsg = (notif.message || '').toLowerCase();
+
     if (notif.targetTab === 'messenger' || notif.category === 'message' || notif.targetId?.startsWith('chat-')) {
       openMessengerInbox(notif.targetId);
       return;
     }
 
+    if (notif.targetTab === 'courses' || notifTitle.includes('কোর্স') || notifTitle.includes('মডিউল') || notifMsg.includes('মডিউল')) {
+      if (onNavigateTab) onNavigateTab('courses', undefined, true);
+      return;
+    }
+
+    if (notif.targetTab === 'student-dashboard' || notifTitle.includes('অ্যাসাইনমেন্ট') || notifTitle.includes('assignment') || notifMsg.includes('অ্যাসাইনমেন্ট')) {
+      if (onNavigateTab) onNavigateTab('student-dashboard', 'my-courses', true);
+      return;
+    }
+
+    if (notif.targetTab === 'financials' || notif.category === 'payout' || notifTitle.includes('ওয়ালেট') || notifTitle.includes('পেমেন্ট') || notifTitle.includes('বোনাস') || notifTitle.includes('ক্যাশআউট')) {
+      if (onNavigateTab) onNavigateTab('financials', undefined, true);
+      return;
+    }
+
+    if (notif.targetTab === 'marketplace' || notifTitle.includes('অর্ডার') || notifTitle.includes('ord-') || notifTitle.includes('এস্ক্রো') || notifTitle.includes('গিগ')) {
+      if (onNavigateTab) onNavigateTab('marketplace', 'my-orders', true);
+      return;
+    }
+
     if (notif.targetTab && onNavigateTab) {
-      onNavigateTab(notif.targetTab);
+      onNavigateTab(notif.targetTab, undefined, true);
     }
   };
 

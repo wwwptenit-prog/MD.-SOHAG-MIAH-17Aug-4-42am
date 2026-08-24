@@ -78,6 +78,7 @@ import {
   Globe,
   PhoneCall,
   Play,
+  PlayCircle,
   BarChart2,
   MoreVertical,
   Bot,
@@ -181,14 +182,15 @@ const AnimatedOverviewCounter: React.FC<{ value: string }> = ({ value }) => {
 };
 
 interface MarketplaceSectionProps {
-  setActiveTab?: (tab: string, category?: string) => void;
+  setActiveTab?: (tab: string, category?: string, pushHistory?: boolean) => void;
   activeTab?: string;
   openAuthModal?: () => void;
   initialCategory?: string;
-  onStartLearning?: (courseId: string, tabMode?: any) => void;
+  onStartLearning?: (courseId: string, tabMode?: any, originCategory?: string) => void;
+  onOpenDetail?: (courseId: string) => void;
 }
 
-export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiveTab, activeTab = 'marketplace', openAuthModal, initialCategory, onStartLearning }) => {
+export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiveTab, activeTab = 'marketplace', openAuthModal, initialCategory, onStartLearning, onOpenDetail }) => {
   const {
     marketplaceUser,
     ptenitUser,
@@ -364,13 +366,272 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
     if (!currentUser) return [];
     return (enrollments || []).filter(e => e.userId === currentUser.id || e.studentId === currentUser.id);
   }, [enrollments, currentUser]);
+
+  const studentEnrolledCourses = useMemo(() => {
+    const enrolledMap = new Map<string, any>();
+    (userEnrollments || []).forEach(e => {
+      enrolledMap.set(e.courseId, e);
+    });
+
+    const listFromDb = (courses || [])
+      .filter(c => enrolledMap.has(c.id))
+      .map(c => {
+        const enr = enrolledMap.get(c.id);
+        const progress = enr?.progress ?? 0;
+        const totalLessons = c.lessonsCount || (c.modules ? c.modules.reduce((acc: number, m: any) => acc + (m.lessons ? m.lessons.length : 0), 0) : 20) || 20;
+        const completedLessons = enr?.completedLessons?.length ?? Math.round((progress / 100) * totalLessons);
+        return {
+          id: c.id,
+          title: c.title,
+          coverImage: c.thumbnail || 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80',
+          instructor: c.instructor || 'PTEN IT Certified Trainer',
+          instructorRole: c.instructorRole || 'Lead Technical Instructor',
+          batch: c.batch || 'ব্যাচ-০১ (লাইভ)',
+          progress: progress,
+          completedLessons: completedLessons,
+          totalLessons: totalLessons,
+          badge: c.category || 'Professional',
+          enrolledDate: enr?.enrolledAt ? new Date(enr.enrolledAt).toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }) : 'চলমান',
+          isLive: true,
+          liveSchedule: c.liveSchedule || 'প্রতি মঙ্গল ও শুক্র রাত ৯:০০ টা'
+        };
+      });
+
+    const standardProCourses = [
+      {
+        id: 'course-canva',
+        title: 'Canva Design & Freelancing Masterclass',
+        coverImage: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80',
+        instructor: 'তানভীর আহমেদ',
+        instructorRole: 'Senior Graphic Designer & Freelancer',
+        batch: 'ব্যাচ-০১ (সম্পন্ন)',
+        progress: 100,
+        completedLessons: 16,
+        totalLessons: 16,
+        badge: 'Graphic Design',
+        enrolledDate: '১২ জানুয়ারি ২০২৬',
+        isLive: false,
+        liveSchedule: 'কোর্স সম্পন্ন (আর্কাইভ লাইভ)'
+      },
+      {
+        id: 'course-mern-pro',
+        title: 'Full-Stack MERN & Next.js Pro Web Development',
+        coverImage: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80',
+        instructor: 'প্রকৌশলী আল-আমিন',
+        instructorRole: 'Lead Full-Stack Architect',
+        batch: 'ব্যাচ-০৮ (লাইভ)',
+        progress: 80,
+        completedLessons: 16,
+        totalLessons: 20,
+        badge: 'MERN Stack',
+        enrolledDate: '১০ জুলাই ২০২৬',
+        isLive: true,
+        liveSchedule: 'প্রতি সোম ও বৃহস্পতি রাত ৯:০০ টা'
+      },
+      {
+        id: 'course-python-ai',
+        title: 'Python, Django & Artificial Intelligence Masterclass',
+        coverImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+        instructor: 'Shahinur Rahman',
+        instructorRole: 'AI & Data Science Specialist',
+        batch: 'ব্যাচ-০৫ (AI স্পেশাল)',
+        progress: 45,
+        completedLessons: 9,
+        totalLessons: 20,
+        badge: 'Python AI',
+        enrolledDate: '১৫ জুলাই ২০২৬',
+        isLive: true,
+        liveSchedule: 'প্রতি রবি ও বুধ রাত ৮:৩০ টা'
+      },
+      {
+        id: 'course-flutter-app',
+        title: 'Mobile App Dev with React Native & Flutter',
+        coverImage: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=80',
+        instructor: 'Zubair Hossain',
+        instructorRole: 'Senior Mobile App Engineer',
+        batch: 'ব্যাচ-১২ (App Dev)',
+        progress: 20,
+        completedLessons: 4,
+        totalLessons: 20,
+        badge: 'App Development',
+        enrolledDate: '০১ আগস্ট ২০২৬',
+        isLive: true,
+        liveSchedule: 'প্রতি মঙ্গল ও শুক্র রাত ৯:০০ টা'
+      }
+    ];
+
+    const finalMap = new Map();
+    listFromDb.forEach(c => finalMap.set(c.id, c));
+    standardProCourses.forEach(c => {
+      if (!finalMap.has(c.id)) {
+        finalMap.set(c.id, c);
+      }
+    });
+
+    return Array.from(finalMap.values());
+  }, [userEnrollments, courses]);
+
+  const studentCertificatesList = useMemo(() => {
+    const userCerts = (certificates || []).filter(c => currentUser ? (c.studentId === currentUser.id || c.studentEmail === currentUser.email) : false);
+    const defaultCerts = [
+      {
+        id: 'cert-1',
+        title: 'ফুল স্ট্যাক MERN ডেভেলপমেন্ট মাস্টারক্লাস',
+        certId: 'CERT-PTEN-MERN-8891',
+        issueDate: '১৫ আগস্ট ২০২৬',
+        grade: 'High Distinction (৯৮%)'
+      },
+      {
+        id: 'cert-2',
+        title: 'পাইথন ড্যাঙ্গো (Django) ও AI ব্যাকএন্ড ইঞ্জিনিয়ারিং',
+        certId: 'CERT-PTEN-PY-4402',
+        issueDate: '১০ জুলাই ২০২৬',
+        grade: 'Distinction (৯৪%)'
+      }
+    ];
+    if (userCerts.length > 0) {
+      return [
+        ...userCerts.map(c => ({
+          id: c.id,
+          title: c.courseName || 'PTENit Certified Professional Track',
+          certId: c.certificateCode || `PTEN-CERT-${c.id}`,
+          issueDate: c.issueDate || 'চলমান মাস',
+          grade: 'Grade A+ (Verified)'
+        })),
+        ...defaultCerts
+      ];
+    }
+    return defaultCerts;
+  }, [certificates, currentUser]);
+
+  const [submittedTasksList, setSubmittedTasksList] = useState([
+    {
+      id: 'task-1',
+      title: 'E-Commerce REST API & Redux Toolkit Integration',
+      course: 'Full-Stack MERN & Next.js Pro',
+      courseName: 'Full-Stack MERN & Next.js Pro',
+      courseId: 'course-mern-pro',
+      marks: '৯৮/১০০ (A+ Grade)',
+      status: 'completed',
+      date: '১৮ আগস্ট ২০২৬',
+      totalMarks: '১০০ মার্কস',
+      passMarks: '৭০ মার্কস',
+      repo: 'https://github.com/student-demo/mern-ecommerce-redux',
+      note: 'সম্পূর্ণ টেস্ট কেস সহ সব এন্ডপয়েন্ট পোস্টম্যানে ভেরিফাই করা হয়েছে।',
+      description: 'রেডুএক্স টুলকিট ও এক্সপ্রেস নোড ব্যাকএন্ড দিয়ে ফুল স্ট্যাক ক্যাটাগরি, প্রোডাক্ট ও কার্ট এপিআই সমাধান।',
+      requirements: [
+        'JWT অথেন্টিকেশন ও প্রোটেক্টেড রুট ইমপ্লিমেন্টেশন।',
+        'Redux Toolkit AsyncThunk দিয়ে স্টেট সিঙ্ক্রোনাইজেশন।',
+        'মঙ্গোডিবি Aggregation Pipeline ব্যবহার করে ফিল্টারিং।'
+      ],
+      feedback: 'চমৎকার ব্যাকএন্ড আর্কিটেকচার এবং ক্লিন রিডাক্স স্লাইস মেথডোলজি ব্যবহার করা হয়েছে।'
+    },
+    {
+      id: 'task-2',
+      title: 'Real-time Socket.io Chat & Notification Service',
+      course: 'Full-Stack MERN & Next.js Pro',
+      courseName: 'Full-Stack MERN & Next.js Pro',
+      courseId: 'course-mern-pro',
+      marks: 'রিভিউর অপেক্ষায়',
+      status: 'pending',
+      date: '২০ আগস্ট ২০২৬',
+      totalMarks: '৫০ মার্কস',
+      passMarks: '৩৫ মার্কস',
+      repo: 'https://github.com/student-demo/socket-live-messaging',
+      note: 'রুম ব্রডকাস্টিং এবং মেসেজ হিস্ট্রি মঙ্গোডিবির সাথে সিঙ্ক করা হয়েছে।',
+      description: 'রিয়েলটাইম দ্বিমুখী চ্যাট ও নোটিফিকেশন সিস্টেম ইমপ্লিমেন্টেশন।',
+      requirements: [
+        'Socket.io হ্যান্ডশেক ও ইউজার রুম জয়েন হ্যান্ডলিং।',
+        'অনলাইন/অফলাইন স্ট্যাটাস ও টাইপিং ইন্ডিকেটর।',
+        'মেসেজ ব্যাকআপ ও রিয়েলটাইম অ্যালার্ট নোটিফিকেশন।'
+      ],
+      feedback: 'ইন্সট্রাকটর আল-আমিন কোড রিভিউ করছেন।'
+    }
+  ]);
+
+  const [pendingAssignmentsList, setPendingAssignmentsList] = useState([
+    {
+      id: 'pending-1',
+      title: 'মডিউল ৭: ইকমার্স শপিং কার্ট ও চেকআউট ইন্টিগ্রেশন প্রজেক্ট',
+      courseId: 'course-mern-pro',
+      courseName: 'Full Stack Web Development',
+      deadline: 'আগামীকাল রাত ১১:৫৯',
+      badge: 'জরুরি',
+      totalMarks: '৫০ মার্কস',
+      passMarks: '৩৫ মার্কস',
+      description: 'একটি সম্পূর্ণ রেসপন্সিভ ই-কমার্স শপিং কার্ট এবং চেকআউট ফ্লো তৈরি করতে হবে যেখানে ইউজার প্রোডাক্ট অ্যাড, কোয়ান্টিটি পরিবর্তন, কুপন ডিসকাউন্ট প্রয়োগ এবং ডেমো পেমেন্ট সম্পন্ন করতে পারবে।',
+      requirements: [
+        'কমপক্ষে ৫টি প্রোডাক্ট লিস্ট ভিউ এবং সিঙ্গেল প্রোডাক্ট বিবরণী তৈরি করা।',
+        'অ্যাড টু কার্ট, আইটেম সংখ্যা বৃদ্ধি/হ্রাস ও রিমুভ করার স্টেট ম্যানেজমেন্ট।',
+        'সাবটোটাল, ভ্যাট/ট্যাক্স এবং কুপন কোড ডিসকাউন্ট রিয়েলটাইম ক্যালকুলেশন।',
+        'গিটহাবে অন্তত ৩টি অর্থপূর্ণ কমিট এবং Vercel/Netlify লাইভ প্রিভিউ লিংক।'
+      ],
+      submissionGuide: 'গিটহাব পাবলিক রিপোজিটরি লিংক অথবা লাইভ হোস্টেড প্রজেক্ট লিংক প্রদান করুন।'
+    },
+    {
+      id: 'pending-2',
+      title: 'মডিউল ৪: ফেসবুক কনভার্সন পিক্সেল ও কাস্টম অডিয়েন্স ক্যাম্পেইন',
+      courseId: 'course-fb-marketing',
+      courseName: 'Facebook Marketing & Paid Ads',
+      deadline: '২৮ আগস্ট ২০২৬',
+      badge: 'নিয়মিত',
+      totalMarks: '৫০ মার্কস',
+      passMarks: '৩৫ মার্কস',
+      description: 'মেটা বিজনেস ম্যানেজারে কনভার্সন পিক্সেল ও কাস্টম অডিয়েন্স স্ট্র্যাটেজি তৈরি করে জমা দিতে হবে। বিভিন্ন ফানেল স্টেজ অনুযায়ী ক্যাম্পেইন স্ট্রাকচার সাজাতে হবে।',
+      requirements: [
+        'ওয়েবসাইটে মেটা পিক্সেল ও স্ট্যান্ডার্ড ইভেন্ট সেটআপের স্ক্রিনশট।',
+        'কাস্টম অডিয়েন্স ও ৩% লুক-অ্যালাইক অডিয়েন্স তৈরির প্রমাণপত্র।',
+        'অ্যাড কপি, হেডলাইন, ক্রিয়েটিভ ব্যানার এবং প্লেসমেন্ট স্ট্র্যাটেজি।',
+        'গুগল ডক বা ড্রাইভ ফোল্ডার লিংক (ভিউয়ার এক্সেস সহ)।'
+      ],
+      submissionGuide: 'গুগল ড্রাইভ বা ডক লিংক (সবার জন্য ভিউ পারমিশন ওপেন রেখে) জমা দিন।'
+    }
+  ]);
+  const [assignmentStatusFilter, setAssignmentStatusFilter] = useState<'new' | 'review' | 'success'>('new');
+  const [selectedAssignmentDetail, setSelectedAssignmentDetail] = useState<{
+    id?: string;
+    title: string;
+    courseName?: string;
+    course?: string;
+    courseId?: string;
+    deadline?: string;
+    badge?: string;
+    totalMarks?: string;
+    passMarks?: string;
+    description?: string;
+    requirements?: string[];
+    submissionGuide?: string;
+    status?: 'new' | 'pending' | 'completed';
+    marks?: string;
+    feedback?: string;
+    date?: string;
+    repo?: string;
+    note?: string;
+  } | null>(null);
+  const [assignmentSubmissionRepo, setAssignmentSubmissionRepo] = useState('');
+  const [assignmentSubmissionNote, setAssignmentSubmissionNote] = useState('');
   const demoLogin = demoLoginMarketplace;
   const logout = logoutMarketplace;
   const updateProfile = updateMarketplaceProfile;
 
-  const [activeSubTab, setActiveSubTab] = useState<'gigs' | 'jobs' | 'courses' | 'post-job' | 'my-orders' | 'ptenit-services' | 'overview' | 'my-courses' | 'saved_gigs' | 'settings' | 'messenger'>('overview');
-  const [studentHubActiveTab, setStudentHubActiveTab] = useState<'my-courses' | 'certificates' | 'assignments'>('my-courses');
-  const [orderHubTab, setOrderHubTab] = useState<'overview' | 'orders' | 'courses'>('overview');
+  const [activeSubTab, setActiveSubTab] = useState<'gigs' | 'jobs' | 'courses' | 'post-job' | 'my-orders' | 'ptenit-services' | 'overview' | 'my-courses' | 'saved_gigs' | 'settings' | 'messenger'>(() => {
+    if (initialCategory === 'my-courses') return 'my-courses';
+    if (initialCategory === 'my-orders' || initialCategory === 'My Orders') return 'my-orders';
+    if (initialCategory === 'courses') return 'courses';
+    if (initialCategory === 'gigs' || initialCategory === 'All') return 'gigs';
+    return 'my-courses';
+  });
+  const [studentHubActiveTab, setStudentHubActiveTab] = useState<'my-courses' | 'certificates' | 'assignments' | 'live-classes' | 'ai-tutor'>('my-courses');
+  const [studentCourseFilter, setStudentCourseFilter] = useState<'all' | 'in_progress' | 'completed' | 'live'>('all');
+  const [studentCourseSearch, setStudentCourseSearch] = useState('');
+  const [newAssignmentText, setNewAssignmentText] = useState('');
+  const [newAssignmentRepo, setNewAssignmentRepo] = useState('');
+  const [newAssignmentCourseId, setNewAssignmentCourseId] = useState('course-mern-pro');
+  const [orderHubTab, setOrderHubTab] = useState<'overview' | 'orders' | 'courses'>(() => {
+    if (initialCategory === 'my-orders' || initialCategory === 'My Orders') return 'orders';
+    if (initialCategory === 'overview') return 'overview';
+    return 'courses';
+  });
   const [overviewInnerTab, setOverviewInnerTab] = useState<'all' | 'courses' | 'orders'>('all');
   const [buyerOrderStatusFilter, setBuyerOrderStatusFilter] = useState<'all' | 'in_progress' | 'in_review' | 'completed' | 'cancelled' | 'public_projects'>('all');
   const [messengerSubTabFilter, setMessengerSubTabFilter] = useState<'all' | 'sellers' | 'online' | 'orders'>('all');
@@ -704,16 +965,30 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
 
     if (initialCategory === 'my-orders' || initialCategory === 'My Orders') {
       setActiveSubTab('my-orders');
+      setOrderHubTab('orders');
       setSelectedGig(null);
     } else if (initialCategory === 'overview') {
       setActiveSubTab('overview');
       setSelectedGig(null);
     } else if (initialCategory === 'my-courses') {
       setActiveSubTab('my-courses');
+      setOrderHubTab('courses');
+      setStudentHubActiveTab('my-courses');
+      setSelectedGig(null);
+    } else if (initialCategory === 'saved_gigs') {
+      setActiveSubTab('saved_gigs');
+      setSelectedGig(null);
+    } else if (initialCategory === 'courses') {
+      setActiveSubTab('courses');
+      setSelectedGig(null);
+    } else if (initialCategory === 'gigs' || initialCategory === 'All') {
+      setActiveSubTab('gigs');
+      setSelectedCategory('All');
       setSelectedGig(null);
     } else if (initialCategory && initialCategory !== 'selling' && initialCategory !== 'seller' && initialCategory !== 'buying' && initialCategory !== 'buyer') {
       setSelectedCategory(initialCategory);
       setActiveSubTab('gigs');
+      setSelectedGig(null);
     }
   }, [initialCategory, currentUser?.role]);
 
@@ -2146,6 +2421,9 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   setSearchQuery('');
                   setIsInboxModalOpen(false);
                   setIsNotificationsOpen(false);
+                  if (setActiveTab) {
+                    setActiveTab('marketplace', 'All', true);
+                  }
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className={`flex-1 flex justify-center items-center py-1.5 transition active:scale-95 cursor-pointer ${
@@ -2167,6 +2445,10 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   setSelectedGig(null);
                   setViewMode('buying');
                   setActiveSubTab('my-orders');
+                  setOrderHubTab('orders');
+                  if (setActiveTab) {
+                    setActiveTab('marketplace', 'my-orders', true);
+                  }
                   setIsInboxModalOpen(false);
                   setIsNotificationsOpen(false);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2240,6 +2522,9 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                   setSelectedGig(null);
                   setViewMode('buying');
                   setActiveSubTab('saved_gigs');
+                  if (setActiveTab) {
+                    setActiveTab('marketplace', 'saved_gigs', true);
+                  }
                   setIsInboxModalOpen(false);
                   setIsNotificationsOpen(false);
                   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -8788,82 +9073,101 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                         {(orderHubTab === 'courses' || activeSubTab === 'my-courses') && (
                           <div className="space-y-4 animate-fadeIn">
 
-                        {/* EXACT STUDENT HUB MENU BAR (স্টুডেন্ট মেনুবার) MATCHING UPLOADED IMAGE */}
                         {/* EXACT STUDENT HUB MENU BAR (স্টুডেন্ট মেনুবার) */}
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xs space-y-3">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3.5">
                           {/* Header Line */}
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 sm:gap-2 font-black text-slate-800 dark:text-slate-100 text-xs sm:text-sm">
-                              <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 text-[#1DB954] shrink-0" />
-                              <span>স্টুডেন্ট মেনুবার</span>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 font-black text-slate-900 dark:text-white text-xs sm:text-sm">
+                              <div className="w-7 h-7 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 text-[#1DB954] flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                                <GraduationCap className="w-4 h-4" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span>স্টুডেন্ট মেনুবার</span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 hidden sm:inline-block">
+                                  সক্রিয় শিক্ষার্থী প্যানেল
+                                </span>
+                              </div>
                             </div>
                             <button
                               type="button"
                               onClick={() => {
                                 setSelectedGig(null);
-                                setViewMode('buying');
-                                setActiveSubTab('gigs');
-                                setSelectedCategory('Programming & Tech');
+                                if (setActiveTab) {
+                                  setActiveTab('courses', undefined, true);
+                                } else {
+                                  setViewMode('buying');
+                                  setActiveSubTab('courses');
+                                }
                               }}
-                              className="text-[#1DB954] hover:text-emerald-400 font-black text-xs sm:text-sm flex items-center transition cursor-pointer hover:underline underline-offset-2 shrink-0"
+                              className="text-[#1DB954] hover:text-emerald-400 font-black text-xs sm:text-sm flex items-center gap-1 transition cursor-pointer hover:underline underline-offset-2 shrink-0 ml-auto"
                             >
                               <span>নতুন কোর্স ব্রাউজ →</span>
                             </button>
                           </div>
 
-                          {/* Horizontal Pills Container (Strict 1 Line Grid) */}
-                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-                            {/* 1. কোর্স (Count 3) */}
+                          {/* Horizontal Navigation Tabs - Single Line Service Order Style (3 Items) */}
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-3 pt-1">
+                            {/* 1. আমার কোর্স (Shortened) */}
                             <button
                               type="button"
                               onClick={() => setStudentHubActiveTab('my-courses')}
-                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                              className={`py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-0 ${
                                 studentHubActiveTab === 'my-courses'
-                                  ? 'bg-[#1DB954] text-white shadow-xs font-black'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+                                  ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-[#1DB954] text-slate-950 dark:text-white shadow-xs font-black ring-1 sm:ring-2 ring-[#1DB954]/30'
+                                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
                               }`}
                             >
-                              <span className="truncate">কোর্স</span>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
-                                studentHubActiveTab === 'my-courses' ? 'bg-black/20 text-white' : 'bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200'
+                              <div className="flex items-center justify-center gap-1 sm:gap-1.5 max-w-full">
+                                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-[#1DB954]" />
+                                <span className="text-[11px] sm:text-xs font-black leading-tight truncate">আমার কোর্স</span>
+                              </div>
+                              <span className={`text-xs sm:text-sm font-black leading-tight ${
+                                studentHubActiveTab === 'my-courses' ? 'text-[#1DB954]' : 'text-slate-800 dark:text-slate-200'
                               }`}>
-                                3
+                                {studentEnrolledCourses.length || 4}টি
                               </span>
                             </button>
 
-                            {/* 2. সার্টিফিকেট (Count 2) */}
-                            <button
-                              type="button"
-                              onClick={() => setStudentHubActiveTab('certificates')}
-                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
-                                studentHubActiveTab === 'certificates'
-                                  ? 'bg-blue-600 text-white shadow-xs font-black'
-                                  : 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50'
-                              }`}
-                            >
-                              <span className="truncate">সার্টিফিকেট</span>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
-                                studentHubActiveTab === 'certificates' ? 'bg-black/20 text-white' : 'bg-blue-200/70 dark:bg-blue-900 text-blue-900 dark:text-blue-200'
-                              }`}>
-                                2
-                              </span>
-                            </button>
-
-                            {/* 3. অ্যাসাইনমেন্ট (Count 2) */}
+                            {/* 2. অ্যাসাইনমেন্ট (বাকি সংখ্যা ডায়নামিক) */}
                             <button
                               type="button"
                               onClick={() => setStudentHubActiveTab('assignments')}
-                              className={`py-1.5 px-1.5 sm:px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-pointer ${
+                              className={`py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-0 ${
                                 studentHubActiveTab === 'assignments'
-                                  ? 'bg-purple-600 text-white shadow-xs font-black'
-                                  : 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                                  ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-500 text-slate-950 dark:text-white shadow-xs font-black ring-1 sm:ring-2 ring-purple-500/30'
+                                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
                               }`}
                             >
-                              <span className="truncate">অ্যাসাইনমেন্ট</span>
-                              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black min-w-4 text-center leading-none ${
-                                studentHubActiveTab === 'assignments' ? 'bg-black/20 text-white' : 'bg-purple-200/70 dark:bg-purple-900 text-purple-900 dark:text-purple-200'
+                              <div className="flex items-center justify-center gap-1 sm:gap-1.5 max-w-full">
+                                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-purple-500" />
+                                <span className="text-[11px] sm:text-xs font-black leading-tight truncate">অ্যাসাইনমেন্ট</span>
+                              </div>
+                              <span className={`text-xs sm:text-sm font-black leading-tight ${
+                                studentHubActiveTab === 'assignments' ? 'text-purple-600 dark:text-purple-400 font-black' : 'text-amber-600 dark:text-amber-400 font-bold'
                               }`}>
-                                2
+                                {pendingAssignmentsList.length > 0 ? `${pendingAssignmentsList.length}টি বাকি` : 'সব সম্পন্ন'}
+                              </span>
+                            </button>
+
+                            {/* 3. লাইভ ক্লাস */}
+                            <button
+                              type="button"
+                              onClick={() => setStudentHubActiveTab('live-classes')}
+                              className={`py-2 sm:py-2.5 px-2 sm:px-3 rounded-xl sm:rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-0 ${
+                                studentHubActiveTab === 'live-classes'
+                                  ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-500 text-slate-950 dark:text-white shadow-xs font-black ring-1 sm:ring-2 ring-rose-500/30'
+                                  : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-1 sm:gap-1.5 max-w-full">
+                                <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-rose-500" />
+                                <span className="text-[11px] sm:text-xs font-black leading-tight truncate">লাইভ ক্লাস</span>
+                              </div>
+                              <span className={`text-[11px] sm:text-xs font-black leading-tight flex items-center gap-1 ${
+                                studentHubActiveTab === 'live-classes' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'
+                              }`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                                <span>রাত ৯:০০</span>
                               </span>
                             </button>
                           </div>
@@ -8871,107 +9175,674 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
 
                         {/* TAB CONTENT 2: CERTIFICATES */}
                         {studentHubActiveTab === 'certificates' && (
-                          <div className="space-y-3">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
+                          <div className="space-y-3 font-bengali">
+                            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <Award className="w-4 h-4 text-[#1DB954]" />
-                                <span>অর্জিত ভেরিফাইড কোর্স সার্টিফিকেট (২ টি)</span>
+                                <Award className="w-5 h-5 text-[#1DB954]" />
+                                <span>অর্জিত ভেরিফাইড কোর্স সার্টিফিকেট ({studentCertificatesList.length} টি)</span>
                               </div>
-                              <span className="bg-[#1DB954] text-white font-black px-2 py-0.5 rounded-md text-[10px]">ভেরিফাইড</span>
+                              <span className="bg-[#1DB954] text-white font-black px-2.5 py-1 rounded-md text-[10px]">PTENit Verified</span>
                             </div>
 
-                            {[
-                              {
-                                title: 'ফুল স্ট্যাক MERN ডেভেলপমেন্ট মাস্টারক্লাস',
-                                certId: 'CERT-PTEN-MERN-8891',
-                                issueDate: '১৫ আগস্ট ২০২৬',
-                                grade: 'High Distinction (৯৮%)'
-                              },
-                              {
-                                title: 'পাইথন ড্যাঙ্গো (Django) ও AI ব্যাকএন্ড ইঞ্জিনিয়ারিং',
-                                certId: 'CERT-PTEN-PY-4402',
-                                issueDate: '১০ জুলাই ২০২৬',
-                                grade: 'Distinction (৯৪%)'
-                              }
-                            ].map((cert, idx) => (
-                              <div key={idx} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/80">
-                                      {cert.certId}
-                                    </span>
-                                    <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1.5">{cert.title}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">ইস্যু ডেট: {cert.issueDate} • ফলাফল: {cert.grade}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                              {studentCertificatesList.map((cert) => (
+                                <div key={cert.id} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 hover:border-blue-400/50 transition">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/80">
+                                        {cert.certId}
+                                      </span>
+                                      <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1.5">{cert.title}</h3>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">ইস্যু ডেট: {cert.issueDate} • ফলাফল: {cert.grade}</p>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-900">
+                                      <Award className="w-5 h-5" />
+                                    </div>
                                   </div>
-                                  <Award className="w-7 h-7 text-[#1DB954] shrink-0" />
+                                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                    <button
+                                      onClick={() => alert(`সার্টিফিকেট ${cert.certId} ডাউনলোড শুরু হয়েছে!`)}
+                                      className="flex-1 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      <span>PDF সার্টিফিকেট</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(`https://ptenit.com/verify/${cert.certId}`);
+                                        alert('সার্টিফিকেট ভেরিফিকেশন লিংক কপি হয়েছে!');
+                                      }}
+                                      className="py-2 px-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                      <span>লিংক</span>
+                                    </button>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                  <button
-                                    onClick={() => alert(`সার্টিফিকেট ${cert.certId} ডাউনলোড শুরু হয়েছে!`)}
-                                    className="flex-1 py-2 bg-[#1DB954] hover:bg-emerald-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                    <span>PDF ডাউনলোড</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard?.writeText(`https://ptenit.com/verify/${cert.certId}`);
-                                      alert('সার্টিফিকেট ভেরিফিকেশন লিংক কপি হয়েছে!');
-                                    }}
-                                    className="py-2 px-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-                                  >
-                                    <Copy className="w-3.5 h-3.5" />
-                                    <span>লিঙ্ক কপি</span>
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         )}
 
-                        {/* TAB CONTENT 3: ASSIGNMENTS */}
+                        {/* TAB CONTENT 3: ASSIGNMENTS & HOMEWORK */}
                         {studentHubActiveTab === 'assignments' && (
-                          <div className="space-y-3">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
+                          <div className="space-y-4 font-bengali">
+                            {/* Segmented Tab Filter: নতুন (New) | রিভিউ (In Review) | সাকসেস (Success) */}
+                            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+                                  {/* 1. নতুন (New Assignments) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAssignmentStatusFilter('new')}
+                                    className={`py-2 px-2.5 sm:px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-0 ${
+                                      assignmentStatusFilter === 'new'
+                                        ? 'bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-300 shadow-xs border border-purple-200 dark:border-purple-800/60'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                  >
+                                    <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span className="truncate">নতুন</span>
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none shrink-0 ${
+                                      assignmentStatusFilter === 'new'
+                                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                    }`}>
+                                      {pendingAssignmentsList.length}
+                                    </span>
+                                  </button>
+
+                                  {/* 2. রিভিউ (In Review) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAssignmentStatusFilter('review')}
+                                    className={`py-2 px-2.5 sm:px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-0 ${
+                                      assignmentStatusFilter === 'review'
+                                        ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs border border-amber-200 dark:border-amber-800/60'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                  >
+                                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span className="truncate">রিভিউ</span>
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none shrink-0 ${
+                                      assignmentStatusFilter === 'review'
+                                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                    }`}>
+                                      {submittedTasksList.filter(t => t.status === 'pending').length}
+                                    </span>
+                                  </button>
+
+                                  {/* 3. সাকসেস (Success / Completed) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAssignmentStatusFilter('success')}
+                                    className={`py-2 px-2.5 sm:px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer min-w-0 ${
+                                      assignmentStatusFilter === 'success'
+                                        ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs border border-emerald-200 dark:border-emerald-800/60'
+                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                    }`}
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
+                                    <span className="truncate">সাকসেস</span>
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none shrink-0 ${
+                                      assignmentStatusFilter === 'success'
+                                        ? 'bg-emerald-100 dark:bg-emerald-950 text-[#1DB954]'
+                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                    }`}>
+                                      {submittedTasksList.filter(t => t.status === 'completed').length}
+                                    </span>
+                                  </button>
+                                </div>
+
+                                {/* VIEW 1: নতুন (New Pending Assignments) - Compact with Left Purple Stripe */}
+                                {assignmentStatusFilter === 'new' && (
+                                  <div className="space-y-3">
+                                    {pendingAssignmentsList.length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {pendingAssignmentsList.map((item) => (
+                                          <div
+                                            key={item.id}
+                                            onClick={() => {
+                                              setSelectedAssignmentDetail(item);
+                                              setAssignmentSubmissionRepo('');
+                                              setAssignmentSubmissionNote('');
+                                            }}
+                                            className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-[5px] border-l-purple-600 dark:border-l-purple-500 shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700/60 transition-all group cursor-pointer flex flex-col justify-between"
+                                          >
+                                            <div className="space-y-2">
+                                              {/* Top Bar: Course Name + Total Marks + Deadline */}
+                                              <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                                <span className="text-[10px] font-black text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/70 px-2 py-0.5 rounded-md border border-purple-200/70 dark:border-purple-900/50 truncate max-w-[180px]">
+                                                  {item.courseName}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 text-[10px]">
+                                                  {item.totalMarks && (
+                                                    <span className="font-black text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
+                                                      {item.totalMarks}
+                                                    </span>
+                                                  )}
+                                                  <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-0.5">
+                                                    <Clock className="w-3 h-3 text-amber-500" />
+                                                    <span>{item.deadline}</span>
+                                                  </span>
+                                                </div>
+                                              </div>
+
+                                              {/* Title */}
+                                              <h5 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug group-hover:text-purple-600 dark:group-hover:text-purple-400 transition">
+                                                {item.title}
+                                              </h5>
+                                            </div>
+
+                                            {/* Bottom Action Row */}
+                                            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                <span>বাকি আছে ({item.badge})</span>
+                                              </span>
+                                              <span className="text-xs font-black text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                                                <span>জমা দিন ও বিস্তারিত</span>
+                                                <span>→</span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950 text-[#1DB954] flex items-center justify-center mx-auto">
+                                          <CheckCircle2 className="w-6 h-6" />
+                                        </div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">সব অ্যাসাইনমেন্ট জমা সম্পন্ন!</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">বর্তমানে আপনার কোনো নতুন বা বাকি অ্যাসাইনমেন্ট নেই।</p>
+                                      </div>
+                                    )}
+
+                                    {/* Custom Assignment Trigger Button */}
+                                    <div className="pt-1 flex justify-end">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedAssignmentDetail({
+                                            id: undefined,
+                                            title: 'কাস্টম মডিউল অ্যাসাইনমেন্ট প্রজেক্ট',
+                                            courseName: studentEnrolledCourses[0]?.title || 'Full Stack Web Development',
+                                            courseId: studentEnrolledCourses[0]?.id || 'course-mern-pro',
+                                            deadline: 'স্বনির্ধারিত',
+                                            totalMarks: '৫০ মার্কস',
+                                            passMarks: '৩৫ মার্কস',
+                                            description: 'কোর্সের যেকোনো নির্দিষ্ট মডিউল বা প্রজেক্ট সমাধান করে সোর্স কোড রিপোজিটরি ও লাইভ প্রিভিউ লিংক জমা দিন।',
+                                            requirements: [
+                                              'প্রজেক্টের সম্পূর্ণ সোর্স কোড গিটহাবে পুশ থাকতে হবে।',
+                                              'লাইভ ডোমেন বা ক্লাউড হোস্টিং প্রিভিউ লিংক থাকতে হবে।',
+                                              'প্রজেক্টে স্পষ্ট Readme ফাইল ও ডকুমেনটেশন সংযুক্ত থাকতে হবে।'
+                                            ],
+                                            submissionGuide: 'গিটহাব পাবলিক রিপোজিটরি অথবা লাইভ হোস্টেড প্রজেক্ট লিংক প্রদান করুন।'
+                                          });
+                                          setAssignmentSubmissionRepo('');
+                                          setAssignmentSubmissionNote('');
+                                        }}
+                                        className="py-2 px-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-slate-700 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                                      >
+                                        <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                                        <span>+ অন্য অ্যাসাইনমেন্ট সাবমিট করুন</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* VIEW 2: রিভিউ (In Review) - Compact with Left Amber Stripe */}
+                                {assignmentStatusFilter === 'review' && (
+                                  <div className="space-y-3">
+                                    {submittedTasksList.filter(t => t.status === 'pending').length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {submittedTasksList
+                                          .filter(t => t.status === 'pending')
+                                          .map((task) => (
+                                            <div
+                                              key={task.id}
+                                              onClick={() => setSelectedAssignmentDetail(task)}
+                                              className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-[5px] border-l-amber-500 dark:border-l-amber-400 shadow-xs hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700/60 transition-all group cursor-pointer flex flex-col justify-between"
+                                            >
+                                              <div className="space-y-2">
+                                                {/* Top row */}
+                                                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                                  <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/70 px-2 py-0.5 rounded-md border border-amber-200/70 dark:border-amber-900/50 flex items-center gap-1">
+                                                    <Clock className="w-3 h-3 text-amber-500 animate-spin" />
+                                                    <span>রিভিউ চলছে</span>
+                                                  </span>
+                                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                                    জমা: {task.date}
+                                                  </span>
+                                                </div>
+
+                                                {/* Title & Course */}
+                                                <h5 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
+                                                  {task.title}
+                                                </h5>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                  কোর্স: <strong className="text-slate-700 dark:text-slate-300">{task.courseName || task.course}</strong>
+                                                </p>
+                                              </div>
+
+                                              {/* Bottom Feedback Snippet */}
+                                              <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                  💬 {task.feedback || 'ইন্সট্রাকটর মূল্যায়ন করছেন...'}
+                                                </span>
+                                                <span className="text-xs font-black text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition-transform shrink-0 flex items-center gap-0.5">
+                                                  <span>ভিউ</span>
+                                                  <span>→</span>
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    ) : (
+                                      <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+                                        <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950 text-amber-600 flex items-center justify-center mx-auto">
+                                          <Clock className="w-6 h-6" />
+                                        </div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">বর্তমানে রিভিউর অপেক্ষায় কোনো অ্যাসাইনমেন্ট নেই</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">নতুন অ্যাসাইনমেন্ট জমা দিলে তা এখানে রিভিউ স্ট্যাটাসে দেখা যাবে।</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* VIEW 3: সাকসেস (Success / Evaluated) - Compact with Left Emerald Stripe */}
+                                {assignmentStatusFilter === 'success' && (
+                                  <div className="space-y-3">
+                                    {submittedTasksList.filter(t => t.status === 'completed').length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {submittedTasksList
+                                          .filter(t => t.status === 'completed')
+                                          .map((task) => (
+                                            <div
+                                              key={task.id}
+                                              onClick={() => setSelectedAssignmentDetail(task)}
+                                              className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-l-[5px] border-l-[#1DB954] dark:border-l-emerald-500 shadow-xs hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700/60 transition-all group cursor-pointer flex flex-col justify-between"
+                                            >
+                                              <div className="space-y-2">
+                                                {/* Top row */}
+                                                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                                  <span className="text-[10px] font-black text-[#1DB954] bg-emerald-50 dark:bg-emerald-950/70 px-2 py-0.5 rounded-md border border-emerald-200/70 dark:border-emerald-900/50 flex items-center gap-1">
+                                                    <CheckCircle className="w-3 h-3 text-[#1DB954]" />
+                                                    <span>মূল্যায়ন সম্পন্ন</span>
+                                                  </span>
+                                                  <div className="flex items-center gap-1.5">
+                                                    {task.marks && (
+                                                      <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                                        মার্কস: {task.marks}
+                                                      </span>
+                                                    )}
+                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                                      {task.date}
+                                                    </span>
+                                                  </div>
+                                                </div>
+
+                                                {/* Title & Course */}
+                                                <h5 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white leading-snug group-hover:text-[#1DB954] transition">
+                                                  {task.title}
+                                                </h5>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                  কোর্স: <strong className="text-slate-700 dark:text-slate-300">{task.courseName || task.course}</strong>
+                                                </p>
+                                              </div>
+
+                                              {/* Bottom Feedback Snippet */}
+                                              <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                  💬 {task.feedback}
+                                                </span>
+                                                <span className="text-xs font-black text-[#1DB954] group-hover:translate-x-0.5 transition-transform shrink-0 flex items-center gap-0.5">
+                                                  <span>রেজাল্ট</span>
+                                                  <span>→</span>
+                                                </span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    ) : (
+                                      <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950 text-[#1DB954] flex items-center justify-center mx-auto">
+                                          <Award className="w-6 h-6" />
+                                        </div>
+                                        <h4 className="text-sm font-black text-slate-900 dark:text-white">এখনও কোনো মূল্যায়ন সম্পন্ন অ্যাসাইনমেন্ট নেই</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">ইন্সট্রাকটর অ্যাসাইনমেন্ট গ্রেড করলে ফলাফল এখানে প্রকাশিত হবে।</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                            {/* POPUP MODAL: টিচারের টাইটেল ও বিস্তারিত + নিচে লিংক এবং বিস্তারিত জমা */}
+                            {selectedAssignmentDetail && (
+                              <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+                                <div
+                                  className="relative w-full max-w-lg max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col font-bengali"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Header: Teacher's Title */}
+                                  <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-slate-50/80 dark:bg-slate-800/40">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-[10px] font-black text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-950 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800">
+                                          {selectedAssignmentDetail.courseName || selectedAssignmentDetail.course || 'কোর্স অ্যাসাইনমেন্ট'}
+                                        </span>
+                                        {selectedAssignmentDetail.deadline && (
+                                          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                            <Clock className="w-3 h-3 text-amber-500" />
+                                            <span>শেষ সময়: {selectedAssignmentDetail.deadline}</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-snug">
+                                        {selectedAssignmentDetail.title}
+                                      </h3>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedAssignmentDetail(null)}
+                                      className="p-1.5 rounded-xl bg-slate-200/60 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition shrink-0 cursor-pointer"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+
+                                  {/* Body */}
+                                  <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
+                                    {/* 1. Teacher's Assignment Details (টিচারের বিস্তারিত) */}
+                                    <div className="p-3.5 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40 rounded-2xl space-y-1.5">
+                                      <span className="text-[11px] font-black text-purple-800 dark:text-purple-300 flex items-center gap-1">
+                                        <FileText className="w-3.5 h-3.5" />
+                                        <span>অ্যাসাইনমেন্টের বিস্তারিত বিবরণ:</span>
+                                      </span>
+                                      <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed font-normal whitespace-pre-line">
+                                        {selectedAssignmentDetail.description || 'সম্পূর্ণ নির্দেশিকা অনুসরণ করে প্রজেক্ট সম্পন্ন করুন এবং নিচে লিংক জমা দিন।'}
+                                      </p>
+                                    </div>
+
+                                    {/* 2. SUBMISSION INPUTS (যদি এখনও জমা দেওয়া না হয়ে থাকে) */}
+                                    {!selectedAssignmentDetail.date && selectedAssignmentDetail.status !== 'completed' && selectedAssignmentDetail.status !== 'pending' ? (
+                                      <div className="space-y-3 pt-1">
+                                        {/* Input 1: Link */}
+                                        <div>
+                                          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                                            গিটহাব বা লাইভ প্রজেক্ট লিংক: <span className="text-rose-500">*</span>
+                                          </label>
+                                          <input
+                                            type="url"
+                                            value={assignmentSubmissionRepo}
+                                            onChange={(e) => setAssignmentSubmissionRepo(e.target.value)}
+                                            placeholder="https://github.com/username/project অথবা লাইভ লিংক"
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-medium"
+                                          />
+                                        </div>
+
+                                        {/* Input 2: Details / Note */}
+                                        <div>
+                                          <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                                            প্রজেক্ট বিস্তারিত / নোট (ঐচ্ছিক):
+                                          </label>
+                                          <textarea
+                                            rows={3}
+                                            value={assignmentSubmissionNote}
+                                            onChange={(e) => setAssignmentSubmissionNote(e.target.value)}
+                                            placeholder="প্রজেক্ট সম্পর্কে কোনো মেসেজ বা বিস্তারিত তথ্য লিখুন..."
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none font-medium"
+                                          />
+                                        </div>
+
+                                        {/* Submit Buttons */}
+                                        <div className="pt-2 flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (!assignmentSubmissionRepo.trim()) {
+                                                alert('দয়া করে গিটহাব রিপোজিটরি বা লাইভ প্রজেক্ট লিংক প্রদান করুন');
+                                                return;
+                                              }
+                                              const newTask = {
+                                                id: `task-${Date.now()}`,
+                                                title: selectedAssignmentDetail.title || 'মডিউল অ্যাসাইনমেন্ট প্রজেক্ট',
+                                                course: selectedAssignmentDetail.courseName || selectedAssignmentDetail.course || 'Full Stack Web Development',
+                                                courseName: selectedAssignmentDetail.courseName || selectedAssignmentDetail.course || 'Full Stack Web Development',
+                                                courseId: selectedAssignmentDetail.courseId || 'course-mern-pro',
+                                                marks: 'রিভিউর অপেক্ষায়',
+                                                status: 'pending' as const,
+                                                date: 'আজ (' + new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }) + ')',
+                                                totalMarks: selectedAssignmentDetail.totalMarks || '৫০ মার্কস',
+                                                passMarks: selectedAssignmentDetail.passMarks || '৩৫ মার্কস',
+                                                repo: assignmentSubmissionRepo.trim(),
+                                                note: assignmentSubmissionNote.trim() || 'সম্পূর্ণ রিকোয়ারমেন্ট অনুযায়ী সমাধান সম্পন্ন করা হয়েছে।',
+                                                description: selectedAssignmentDetail.description,
+                                                feedback: 'সাবমিশন গ্রহণ করা হয়েছে। ইন্সট্রাকটর শীঘ্রই কোড রিভিউ সম্পন্ন করবেন।'
+                                              };
+
+                                              setSubmittedTasksList(prev => [newTask, ...prev]);
+
+                                              if (selectedAssignmentDetail.id) {
+                                                setPendingAssignmentsList(prev => prev.filter(p => p.id !== selectedAssignmentDetail.id));
+                                              }
+
+                                              setAssignmentSubmissionRepo('');
+                                              setAssignmentSubmissionNote('');
+                                              setSelectedAssignmentDetail(null);
+                                              setAssignmentStatusFilter('review');
+                                              alert('✓ অ্যাসাইনমেন্ট সফলভাবে জমা দেওয়া হয়েছে! রিভিউ ট্যাবে যুক্ত হয়েছে।');
+                                            }}
+                                            className="flex-1 py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white font-black rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md active:scale-98"
+                                          >
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            <span>জমা দিন (Submit)</span>
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => setSelectedAssignmentDetail(null)}
+                                            className="py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 transition cursor-pointer"
+                                          >
+                                            বাতিল
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      /* Review & Completed Details View in Popup */
+                                      <div className="space-y-3 pt-1">
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1">
+                                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">আপনার জমাকৃত লিংক:</span>
+                                          {selectedAssignmentDetail.repo ? (
+                                            <a
+                                              href={selectedAssignmentDetail.repo}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="text-xs font-black text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1 break-all"
+                                            >
+                                              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                              <span>{selectedAssignmentDetail.repo}</span>
+                                            </a>
+                                          ) : (
+                                            <span className="text-xs text-slate-700 dark:text-slate-300">লিংক সংরক্ষিত নেই</span>
+                                          )}
+                                        </div>
+
+                                        {selectedAssignmentDetail.note && (
+                                          <div className="p-3 bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1">
+                                            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">আপনার সাবমিশন নোট:</span>
+                                            <p className="text-xs text-slate-700 dark:text-slate-300">{selectedAssignmentDetail.note}</p>
+                                          </div>
+                                        )}
+
+                                        <div className={`p-3.5 rounded-xl border space-y-1.5 ${
+                                          selectedAssignmentDetail.status === 'completed'
+                                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
+                                            : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200'
+                                        }`}>
+                                          <div className="flex items-center justify-between text-xs font-black">
+                                            <span>ফিডব্যাক ও স্ট্যাটাস:</span>
+                                            {selectedAssignmentDetail.marks && (
+                                              <span className="px-2 py-0.5 rounded-md text-xs font-black bg-white dark:bg-slate-900 border">
+                                                {selectedAssignmentDetail.marks}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-xs">
+                                            {selectedAssignmentDetail.feedback || 'ইন্সট্রাকটর মূল্যায়ন করছেন...'}
+                                          </p>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedAssignmentDetail(null)}
+                                          className="w-full mt-2 py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-bold transition cursor-pointer"
+                                        >
+                                          বন্ধ করুন
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* TAB CONTENT 4: LIVE CLASSES & SCHEDULE */}
+                        {studentHubActiveTab === 'live-classes' && (
+                          <div className="space-y-4 font-bengali">
+                            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-[#1DB954]" />
-                                <span>কোর্স অ্যাসাইনমেন্টস ও প্রজেক্ট জমা (২ টি)</span>
+                                <Video className="w-5 h-5 text-rose-500" />
+                                <span>লাইভ ক্লাস শিডিউল ও সরাসরি জয়েন (Google Meet)</span>
                               </div>
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 animate-pulse">
+                                ● লাইভ সেশন সক্রিয়
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                              {studentEnrolledCourses.map((c) => (
+                                <div key={c.id} className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <span className="px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-[10px] font-black border border-rose-200 dark:border-rose-800">
+                                        {c.batch}
+                                      </span>
+                                      <h4 className="text-sm font-black text-slate-900 dark:text-white mt-1.5">{c.title}</h4>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">ইন্সট্রাকটর: {c.instructor}</p>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-500 flex items-center justify-center shrink-0 border border-rose-200 dark:border-rose-900">
+                                      <Video className="w-5 h-5" />
+                                    </div>
+                                  </div>
+
+                                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+                                    <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
+                                      <span>ক্লাস শিডিউল:</span>
+                                      <span className="font-bold text-rose-600 dark:text-rose-400">{c.liveSchedule}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-slate-700 dark:text-slate-300">
+                                      <span>ক্লাসরুম স্ট্যাটাস:</span>
+                                      <span className="font-bold text-emerald-600 dark:text-emerald-400">Google Meet লিঙ্ক প্রস্তুত</span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => createGoogleMeetCall(`meet-${c.id}`)}
+                                    className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs"
+                                  >
+                                    <Video className="w-4 h-4" />
+                                    <span>সরাসরি লাইভ ক্লাসে জয়েন করুন</span>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TAB CONTENT 5: AI STUDY TUTOR */}
+                        {studentHubActiveTab === 'ai-tutor' && (
+                          <div className="p-4 sm:p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3.5 font-bengali">
+                            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center border border-amber-200 dark:border-amber-800">
+                                  <Bot className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-black text-slate-900 dark:text-white">AI স্টাডি অ্যাসিস্ট্যান্ট ও কোডিং টিউটর</h4>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">২৪/৭ যে কোন প্রবলেম, কোড সমাধান বা কনসেপ্ট বোঝার জন্য প্রশ্ন করুন</p>
+                                </div>
+                              </div>
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                Gemini 2.5 Live
+                              </span>
+                            </div>
+
+                            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                              {aiTutorMessages.map((msg, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`p-3 rounded-2xl text-xs leading-relaxed ${
+                                    msg.sender === 'user'
+                                      ? 'bg-[#1DB954] text-white ml-auto max-w-[85%]'
+                                      : 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 max-w-[92%]'
+                                  }`}
+                                >
+                                  {msg.text}
+                                </div>
+                              ))}
+                              {isAiTutorThinking && (
+                                <div className="p-3 rounded-2xl text-xs bg-slate-50 dark:bg-slate-800 text-slate-500 animate-pulse border border-slate-200 dark:border-slate-700 w-36">
+                                  AI চিন্তা করছে...
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                              <input
+                                type="text"
+                                value={aiTutorInput}
+                                onChange={(e) => setAiTutorInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && aiTutorInput.trim()) {
+                                    const query = aiTutorInput.trim();
+                                    setAiTutorMessages(prev => [...prev, { sender: 'user', text: query }]);
+                                    setAiTutorInput('');
+                                    setIsAiTutorThinking(true);
+                                    setTimeout(() => {
+                                      setAiTutorMessages(prev => [
+                                        ...prev,
+                                        { sender: 'ai', text: `আপনার প্রশ্ন "${query}" এর চমৎকার বিশ্লেষণ: এই বিষয়ের জন্য প্রজেক্টে স্টেট হ্যান্ডলিং ও মডিউলার আর্কিটেকচার বজায় রাখুন। বিস্তারিত কোড সহায়তা লাগলে নির্দিষ্ট ফাংশনটি শেয়ার করুন।` }
+                                      ]);
+                                      setIsAiTutorThinking(false);
+                                    }, 700);
+                                  }
+                                }}
+                                placeholder="আপনার যে কোন কোডিং বা কোর্স সম্পর্কিত প্রশ্ন লিখুন..."
+                                className="flex-1 p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1DB954]"
+                              />
                               <button
-                                onClick={() => alert('নতুন অ্যাসাইনমেন্ট সাবমিট ফর্ম চালু হচ্ছে...')}
-                                className="bg-[#1DB954] hover:bg-emerald-500 text-white font-black px-2.5 py-1 rounded-lg text-[10px] cursor-pointer shadow-xs transition"
+                                onClick={() => {
+                                  if (!aiTutorInput.trim()) return;
+                                  const query = aiTutorInput.trim();
+                                  setAiTutorMessages(prev => [...prev, { sender: 'user', text: query }]);
+                                  setAiTutorInput('');
+                                  setIsAiTutorThinking(true);
+                                  setTimeout(() => {
+                                    setAiTutorMessages(prev => [
+                                      ...prev,
+                                      { sender: 'ai', text: `আপনার প্রশ্ন "${query}" এর চমৎকার বিশ্লেষণ: এই বিষয়ের জন্য প্রজেক্টে স্টেট হ্যান্ডলিং ও মডিউলার আর্কিটেকচার বজায় রাখুন। বিস্তারিত কোড সহায়তা লাগলে নির্দিষ্ট ফাংশনটি শেয়ার করুন।` }
+                                    ]);
+                                    setIsAiTutorThinking(false);
+                                  }, 700);
+                                }}
+                                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition"
                               >
-                                + নতুন জমা দিন
+                                জিজ্ঞাসা করুন
                               </button>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-[#1DB954] text-[10px] font-bold border border-emerald-200 dark:border-emerald-800/80">
-                                    অ্যাসাইনমেন্ট-১ • সম্পন্ন (১০০%)
-                                  </span>
-                                  <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1">E-Commerce REST API & Redux Toolkit Integration</h3>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">প্রাপ্ত নম্বর: ৯৮/১০০ (A+ Grade)</p>
-                                </div>
-                                <CheckCircle className="w-5 h-5 text-[#1DB954] shrink-0" />
-                              </div>
-                              <p className="text-xs bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/60 text-slate-700 dark:text-slate-300">
-                                💬 <strong>ইনস্ট্রাকটর ফিডব্যাক:</strong> "চমৎকার ব্যাকএন্ড আর্কিটেকচার এবং ক্লিন রিডাক্স স্লাইস মেথডোলজি ব্যবহার করা হয়েছে।"
-                              </p>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-bold border border-slate-200 dark:border-slate-700">
-                                    অ্যাসাইনমেন্ট-২ • রিভিউর অপেক্ষায়
-                                  </span>
-                                  <h3 className="text-sm font-black text-slate-900 dark:text-white mt-1">Real-time Socket.io Chat & Notification Service</h3>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">জমা দেওয়ার তারিখ: ২০ আগস্ট ২০২৬</p>
-                                </div>
-                                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
-                              </div>
                             </div>
                           </div>
                         )}
@@ -9493,134 +10364,84 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                             )}
 
                             {/* Clean Course Cards List - PTEN IT Styled */}
-                            <div className="space-y-4">
-                              {[
-                                {
-                                  id: 'course-mern-pro',
-                                  title: 'Full-Stack MERN & Next.js Pro Web Development',
-                                  coverImage: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80',
-                                  instructor: 'প্রকৌশলী আল-আমিন',
-                                  instructorRole: 'Lead Full-Stack Architect',
-                                  batch: 'ব্যাচ-০৮ (লাইভ)',
-                                  progress: 80,
-                                  completedLessons: 16,
-                                  totalLessons: 20,
-                                  badge: 'MERN Stack',
-                                  enrolledDate: '১০ জুলাই ২০২৬'
-                                },
-                                {
-                                  id: 'course-python-ai',
-                                  title: 'Python, Django & Artificial Intelligence Masterclass',
-                                  coverImage: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
-                                  instructor: 'Shahinur Rahman',
-                                  instructorRole: 'AI & Data Science Specialist',
-                                  batch: 'ব্যাচ-০৫ (AI স্পেশাল)',
-                                  progress: 45,
-                                  completedLessons: 9,
-                                  totalLessons: 20,
-                                  badge: 'Python AI',
-                                  enrolledDate: '১৫ জুলাই ২০২৬'
-                                },
-                                {
-                                  id: 'course-flutter-app',
-                                  title: 'Mobile App Dev with React Native & Flutter',
-                                  coverImage: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=80',
-                                  instructor: 'Zubair Hossain',
-                                  instructorRole: 'Senior Mobile App Engineer',
-                                  batch: 'ব্যাচ-১২ (App Dev)',
-                                  progress: 20,
-                                  completedLessons: 4,
-                                  totalLessons: 20,
-                                  badge: 'App Development',
-                                  enrolledDate: '০১ আগস্ট ২০২৬'
-                                }
-                              ].filter(c => {
-                                if (!orderSearchQuery) return true;
-                                const q = orderSearchQuery.toLowerCase();
-                                return c.title.toLowerCase().includes(q) || c.instructor.toLowerCase().includes(q) || c.badge.toLowerCase().includes(q);
-                              }).map((course) => (
+                            <div className="space-y-4 font-bengali">
+                              {studentEnrolledCourses.map((course) => (
                                 <div
                                   key={course.id}
-                                  className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 space-y-4 overflow-hidden group"
+                                  className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-md transition-all duration-200 space-y-3.5 overflow-hidden group"
                                 >
-                                  {/* Course Main Cover Photo with Play Action */}
-                                  <div
-                                    onClick={() => {
-                                      if (onStartLearning) {
-                                        onStartLearning(course.id || 'course-mern-pro', 'video');
-                                      } else {
-                                        setActiveMarketplaceCourseModal({
-                                          courseTitle: course.title,
-                                          courseId: course.id,
-                                          coverImage: course.coverImage,
-                                          instructor: course.instructor,
-                                          instructorRole: course.instructorRole,
-                                          batch: course.batch,
-                                          badge: course.badge,
-                                          progress: course.progress,
-                                          completedLessons: course.completedLessons,
-                                          totalLessons: course.totalLessons,
-                                          activeLessonIndex: course.completedLessons + 1,
-                                          activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
-                                          featureType: 'video',
-                                          featureTitle: '🎬 ক্লাস ভিডিও প্লেয়ার'
-                                        });
-                                        setCourseIsPlaying(true);
-                                      }
-                                    }}
-                                    className="relative aspect-video sm:aspect-[21/9] w-full rounded-xl overflow-hidden bg-slate-950 cursor-pointer"
-                                  >
-                                    <img
-                                      src={course.coverImage}
-                                      alt={course.title}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-85"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
-
-                                    {/* Top Overlay Badges */}
-                                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                                  {/* Course Title & Instructor Header */}
+                                  <div className="flex items-start gap-3.5">
+                                    <div
+                                      onClick={() => {
+                                        if (onStartLearning) {
+                                          onStartLearning(course.id, 'video', activeSubTab);
+                                        } else if (onOpenDetail) {
+                                          onOpenDetail(course.id);
+                                        }
+                                      }}
+                                      className="relative w-20 h-14 sm:w-24 sm:h-16 rounded-xl overflow-hidden bg-slate-950 shrink-0 cursor-pointer border border-slate-200 dark:border-slate-800 group-hover:scale-102 transition"
+                                    >
+                                      <img
+                                        src={course.coverImage}
+                                        alt={course.title}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                                        <Play className="w-5 h-5 text-white fill-white" />
+                                      </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#1DB954] text-white shadow-sm">
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-[#1DB954]/15 text-[#1DB954]">
                                           {course.badge}
                                         </span>
-                                        <span className="px-2.5 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white font-medium text-[10px]">
-                                          {course.batch}
-                                        </span>
+                                        {course.batch && (
+                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                            {course.batch}
+                                          </span>
+                                        )}
                                       </div>
-                                      <div className="flex items-center gap-1 text-[10px] font-bold text-white bg-black/60 backdrop-blur-md px-2.5 py-0.5 rounded-full">
-                                        <Clock className="w-3 h-3 text-[#1DB954]" />
-                                        <span>এনরোল্ড: {course.enrolledDate}</span>
-                                      </div>
-                                    </div>
-
-                                    {/* Center Play Button */}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#1DB954] text-white flex items-center justify-center shadow-xl group-hover:scale-110 group-active:scale-95 transition">
-                                        <Play className="w-6 h-6 fill-white ml-0.5" />
-                                      </div>
-                                    </div>
-
-                                    {/* Bottom Overlay Info */}
-                                    <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2">
-                                      <div>
-                                        <span className="text-[11px] text-emerald-400 font-bold">
-                                          ইন্সট্রাকটর: {course.instructor}
-                                        </span>
-                                        <h4 className="text-sm sm:text-base font-black text-white leading-tight drop-shadow-md">
-                                          {course.title}
-                                        </h4>
-                                      </div>
+                                      <h4
+                                        onClick={() => {
+                                          if (onOpenDetail) onOpenDetail(course.id);
+                                          else if (onStartLearning) onStartLearning(course.id, 'video', activeSubTab);
+                                        }}
+                                        className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-snug truncate hover:text-[#1DB954] transition cursor-pointer"
+                                      >
+                                        {course.title}
+                                      </h4>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                                        ইন্সট্রাক্টর: <span className="text-slate-800 dark:text-slate-200 font-bold">{course.instructor}</span>
+                                      </p>
                                     </div>
                                   </div>
 
-                                  {/* Action Buttons: ক্লাসরুমে প্রবেশ | লাইভ ক্লাস | অ্যাসাইনমেন্ট | সার্টিফিকেট */}
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                                    {/* Button 1: ক্লাসরুমে প্রবেশ */}
+                                  {/* Progress bar with exact requested labels */}
+                                  <div className="space-y-1.5 pt-1">
+                                    <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                                      <span className="flex items-center gap-1.5">
+                                        <BookOpen className="w-3.5 h-3.5 text-[#1DB954]" />
+                                        <span>অগ্রগতি</span>
+                                      </span>
+                                      <span className="text-[#1DB954] font-black">{course.progress}% সম্পন্ন</span>
+                                    </div>
+                                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-gradient-to-r from-[#1DB954] to-emerald-400 rounded-full transition-all duration-500"
+                                        style={{ width: `${course.progress}%` }}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons: ক্লাসে যান | বিস্তারিত | লাইভ ক্লাস | সার্টিফিকেট */}
+                                  <div className="flex items-center gap-2 pt-1">
+                                    {/* Button 1: ক্লাসে যান */}
                                     <button
                                       type="button"
                                       onClick={() => {
                                         if (onStartLearning) {
-                                          onStartLearning(course.id || 'course-mern-pro', 'video');
+                                          onStartLearning(course.id || 'course-canva', 'video', activeSubTab);
                                         } else {
                                           setActiveMarketplaceCourseModal({
                                             courseTitle: course.title,
@@ -9633,26 +10454,26 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                             progress: course.progress,
                                             completedLessons: course.completedLessons,
                                             totalLessons: course.totalLessons,
-                                            activeLessonIndex: course.completedLessons + 1,
-                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
+                                            activeLessonIndex: (course.completedLessons || 0) + 1,
+                                            activeLessonTitle: 'লেসন ' + ((course.completedLessons || 0) + 1),
                                             featureType: 'video',
                                             featureTitle: '🎬 ক্লাস ভিডিও দেখা'
                                           });
                                           setCourseIsPlaying(true);
                                         }
                                       }}
-                                      className="py-2.5 px-2 rounded-xl bg-[#1DB954] hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm shadow-[#1DB954]/20 transition-all cursor-pointer active:scale-95 group"
+                                      className="flex-1 py-2.5 px-3 rounded-xl bg-[#1DB954] hover:bg-emerald-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm shadow-[#1DB954]/20 transition cursor-pointer active:scale-95"
                                     >
-                                      <Play className="w-3.5 h-3.5 fill-white shrink-0 group-hover:scale-110 transition" />
-                                      <span className="truncate">ক্লাসরুমে প্রবেশ</span>
+                                      <PlayCircle className="w-4 h-4 shrink-0" />
+                                      <span>ক্লাসে যান</span>
                                     </button>
 
-                                    {/* Button 2: লাইভ ক্লাস */}
+                                    {/* Button 2: বিস্তারিত */}
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        if (onStartLearning) {
-                                          onStartLearning(course.id || 'course-mern-pro', 'live');
+                                        if (onOpenDetail) {
+                                          onOpenDetail(course.id);
                                         } else {
                                           setActiveMarketplaceCourseModal({
                                             courseTitle: course.title,
@@ -9665,83 +10486,119 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                             progress: course.progress,
                                             completedLessons: course.completedLessons,
                                             totalLessons: course.totalLessons,
-                                            activeLessonIndex: course.completedLessons + 1,
-                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
-                                            featureType: 'live_class',
-                                            featureTitle: '🎥 লাইভ ডাউট সেশন'
+                                            activeLessonIndex: 1,
+                                            activeLessonTitle: 'কোর্স ওভারভিউ',
+                                            featureType: 'syllabus',
+                                            featureTitle: '📚 সিলেবাস ও মডিউল'
                                           });
                                         }
                                       }}
-                                      className="py-2.5 px-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-red-600 dark:hover:bg-red-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 border border-slate-700/80 hover:border-red-500 transition-all cursor-pointer active:scale-95 group"
+                                      className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition cursor-pointer active:scale-95"
                                     >
-                                      <Video className="w-3.5 h-3.5 text-red-400 group-hover:text-white shrink-0" />
-                                      <span className="truncate">লাইভ ক্লাস</span>
+                                      <Info className="w-3.5 h-3.5" />
+                                      <span>বিস্তারিত</span>
                                     </button>
 
-                                    {/* Button 3: অ্যাসাইনমেন্ট */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (onStartLearning) {
-                                          onStartLearning(course.id || 'course-mern-pro', 'assignment');
-                                        } else {
-                                          setActiveMarketplaceCourseModal({
-                                            courseTitle: course.title,
-                                            courseId: course.id,
-                                            coverImage: course.coverImage,
-                                            instructor: course.instructor,
-                                            instructorRole: course.instructorRole,
-                                            batch: course.batch,
-                                            badge: course.badge,
-                                            progress: course.progress,
-                                            completedLessons: course.completedLessons,
-                                            totalLessons: course.totalLessons,
-                                            activeLessonIndex: course.completedLessons + 1,
-                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
-                                            featureType: 'assignment',
-                                            featureTitle: '📝 কোর্স অ্যাসাইনমেন্টস'
-                                          });
-                                        }
-                                      }}
-                                      className="py-2.5 px-2 rounded-xl bg-slate-100 dark:bg-slate-800/90 hover:bg-amber-500 hover:text-white text-slate-800 dark:text-slate-100 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95 group"
-                                    >
-                                      <FileText className="w-3.5 h-3.5 text-amber-500 group-hover:text-white shrink-0" />
-                                      <span className="truncate">অ্যাসাইনমেন্ট</span>
-                                    </button>
+                                    {/* Button 3: লাইভ ক্লাস (if active/scheduled) */}
+                                    {course.isLive && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (onStartLearning) {
+                                            onStartLearning(course.id, 'live', activeSubTab);
+                                          } else {
+                                            setActiveMarketplaceCourseModal({
+                                              courseTitle: course.title,
+                                              courseId: course.id,
+                                              coverImage: course.coverImage,
+                                              instructor: course.instructor,
+                                              instructorRole: course.instructorRole,
+                                              batch: course.batch,
+                                              badge: course.badge,
+                                              progress: course.progress,
+                                              completedLessons: course.completedLessons,
+                                              totalLessons: course.totalLessons,
+                                              activeLessonIndex: 1,
+                                              activeLessonTitle: 'লাইভ ক্লাস',
+                                              featureType: 'live_class',
+                                              featureTitle: '🎥 লাইভ ডাউট সেশন'
+                                            });
+                                          }
+                                        }}
+                                        className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 hover:bg-red-600 hover:text-white text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 font-bold text-xs transition cursor-pointer"
+                                        title="লাইভ ক্লাস"
+                                      >
+                                        <Video className="w-4 h-4" />
+                                      </button>
+                                    )}
 
-                                    {/* Button 4: সার্টিফিকেট (লক/আনলক লজিকসহ) */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (onStartLearning) {
-                                          onStartLearning(course.id || 'course-mern-pro', 'certificate');
-                                        } else {
-                                          setActiveMarketplaceCourseModal({
-                                            courseTitle: course.title,
-                                            courseId: course.id,
-                                            coverImage: course.coverImage,
-                                            instructor: course.instructor,
-                                            instructorRole: course.instructorRole,
-                                            batch: course.batch,
-                                            badge: course.badge,
-                                            progress: course.progress,
-                                            completedLessons: course.completedLessons,
-                                            totalLessons: course.totalLessons,
-                                            activeLessonIndex: course.completedLessons + 1,
-                                            activeLessonTitle: 'লেসন ' + (course.completedLessons + 1),
-                                            featureType: 'certificate',
-                                            featureTitle: '🏆 সার্টিফিকেট ভিউ'
-                                          });
-                                        }
-                                      }}
-                                      className="py-2.5 px-2 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-600 hover:text-white text-purple-800 dark:text-purple-300 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-purple-200 dark:border-purple-800/70 transition-all cursor-pointer active:scale-95 group"
-                                    >
-                                      <Award className="w-3.5 h-3.5 text-purple-500 group-hover:text-white shrink-0" />
-                                      <span className="truncate">সার্টিফিকেট</span>
-                                    </button>
+                                    {/* Button 4: সার্টিফিকেট (if 100% complete) */}
+                                    {course.progress >= 100 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (onStartLearning) {
+                                            onStartLearning(course.id, 'certificate', activeSubTab);
+                                          } else {
+                                            setActiveMarketplaceCourseModal({
+                                              courseTitle: course.title,
+                                              courseId: course.id,
+                                              coverImage: course.coverImage,
+                                              instructor: course.instructor,
+                                              instructorRole: course.instructorRole,
+                                              batch: course.batch,
+                                              badge: course.badge,
+                                              progress: course.progress,
+                                              completedLessons: course.completedLessons,
+                                              totalLessons: course.totalLessons,
+                                              activeLessonIndex: course.completedLessons,
+                                              activeLessonTitle: 'সার্টিফিকেট ভিউ',
+                                              featureType: 'certificate',
+                                              featureTitle: '🏆 সার্টিফিকেট ভিউ'
+                                            });
+                                          }
+                                        }}
+                                        className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-600 hover:text-white text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/60 font-bold text-xs transition cursor-pointer"
+                                        title="সার্টিফিকেট"
+                                      >
+                                        <Award className="w-4 h-4" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ))}
+
+                              {studentEnrolledCourses
+                                .filter(c => {
+                                  if (studentCourseFilter === 'ongoing') return c.progress < 100;
+                                  if (studentCourseFilter === 'completed') return c.progress >= 100;
+                                  if (studentCourseFilter === 'live') return c.isLive;
+                                  return true;
+                                })
+                                .filter(c => {
+                                  if (!studentCourseSearch.trim()) return true;
+                                  const q = studentCourseSearch.toLowerCase();
+                                  return (
+                                    c.title.toLowerCase().includes(q) ||
+                                    c.instructor.toLowerCase().includes(q) ||
+                                    c.badge.toLowerCase().includes(q)
+                                  );
+                                }).length === 0 && (
+                                <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                                  <BookOpen className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+                                  <p className="text-sm font-bold text-slate-700 dark:text-slate-200">কোন কোর্স পাওয়া যায়নি</p>
+                                  <p className="text-xs text-slate-500">আপনার ফিল্টার পরিবর্তন করুন অথবা নতুন কোর্সে এনরোল করুন।</p>
+                                  <button
+                                    onClick={() => {
+                                      setStudentCourseSearch('');
+                                      setStudentCourseFilter('all');
+                                    }}
+                                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-200 transition"
+                                  >
+                                    ফিল্টার রিসেট করুন
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </>
                         )}
@@ -9766,7 +10623,14 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                                     setSelectedGig(null);
                                     setViewMode('buying');
                                     setActiveSubTab('gigs');
-                                    setSelectedCategory('all');
+                                    setSelectedCategory('All');
+                                    setShowSavedOnly(false);
+                                    setSearchQuery('');
+                                    setOrderHubTab('orders');
+                                    if (setActiveTab) {
+                                      setActiveTab('marketplace', 'All', true);
+                                    }
+                                    window.scrollTo({ top: 0, behavior: 'instant' });
                                   }}
                                   className="text-[#1DB954] hover:text-emerald-400 font-black text-xs sm:text-sm flex items-center transition cursor-pointer hover:underline underline-offset-2 shrink-0 whitespace-nowrap"
                                 >
@@ -10478,10 +11342,37 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     key={n.id}
                     onClick={() => {
                       markNotificationRead(n.id);
-                      if (n.targetTab && setActiveTab) {
-                        setActiveTab(n.targetTab);
-                        setIsNotificationsOpen(false);
+                      setIsNotificationsOpen(false);
+
+                      const cat = n.category || 'system';
+                      let catLabel = '⚡ বিষয় নোটিশ';
+                      let catBadgeClass = 'bg-slate-500/15 text-slate-400 border-slate-500/30';
+                      if (cat === 'seller') {
+                        catLabel = '💼 বায়ার অর্ডার ও ডেলিভারি';
+                        catBadgeClass = 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30';
+                      } else if (cat === 'mentor') {
+                        catLabel = '🎓 মেন্টর ও ক্লাসরুম';
+                        catBadgeClass = 'bg-teal-500/15 text-teal-500 border-teal-500/30';
+                      } else if (cat === 'payout') {
+                        catLabel = '💳 ক্যাশআউট ও আর্নিং';
+                        catBadgeClass = 'bg-amber-500/15 text-amber-500 border-amber-500/30';
                       }
+
+                      setViewingNotifDetail({
+                        id: n.id,
+                        type: n.type === 'info' ? 'notification' : n.type,
+                        category: cat,
+                        categoryLabel: catLabel,
+                        categoryBadgeClass: catBadgeClass,
+                        senderName: n.senderName || 'PTEN IT System',
+                        senderAvatar: n.senderAvatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=150&q=80',
+                        title: n.title,
+                        text: n.message,
+                        time: n.time,
+                        read: true,
+                        targetTab: n.targetTab,
+                        original: n
+                      });
                     }}
                     className={`p-2.5 rounded-xl border transition cursor-pointer ${
                       n.read
@@ -10496,7 +11387,11 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                       </span>
                       <span className="text-[9px] text-slate-400 font-normal">{n.time}</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">{n.message}</p>
+                    <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-2">{n.message}</p>
+                    <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-slate-200 dark:border-slate-800/80 text-[10px]">
+                      <span className="text-[#1DB954] font-bold">বিস্তারিত দেখুন →</span>
+                      <span className="text-slate-400 font-normal">{n.read ? 'পঠিত' : 'অপঠিত'}</span>
+                    </div>
                   </div>
                 ))
               )}
@@ -12231,6 +13126,7 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
                     text: notif.message,
                     time: notif.time,
                     read: notif.read,
+                    targetTab: notif.targetTab,
                     original: notif
                   };
                 });
@@ -12755,33 +13651,131 @@ export const MarketplaceSection: React.FC<MarketplaceSectionProps> = ({ setActiv
               <button
                 type="button"
                 onClick={() => {
+                  const targetTab = viewingNotifDetail.targetTab || viewingNotifDetail.original?.targetTab;
+                  const notifTitle = (viewingNotifDetail.title || '').toLowerCase();
+                  const notifText = (viewingNotifDetail.text || viewingNotifDetail.message || '').toLowerCase();
+                  const senderName = viewingNotifDetail.senderName || viewingNotifDetail.original?.senderName || '';
+
                   setViewingNotifDetail(null);
                   setIsCentralNotificationOpen(false);
                   setIsInboxModalOpen(false);
+                  setIsNotificationsOpen(false);
 
-                  if (viewingNotifDetail.type === 'message' || viewingNotifDetail.category === 'messages') {
+                  // 1. Direct Message / Chat inquiry
+                  if (
+                    viewingNotifDetail.type === 'message' ||
+                    viewingNotifDetail.category === 'messages' ||
+                    viewingNotifDetail.category === 'message' ||
+                    (senderName && (senderName.includes('সোহাগ') || senderName.includes('তানজিম') || senderName.includes('রাশেদুল') || senderName.includes('বায়ার') || senderName.includes('সেবাগ্রহীতা')))
+                  ) {
                     openChatWindow({
-                      senderName: viewingNotifDetail.senderName,
+                      senderName: senderName || 'Client',
                       senderRole: viewingNotifDetail.senderRole || 'Client',
-                      senderAvatar: viewingNotifDetail.senderAvatar,
-                      initialMessage: viewingNotifDetail.text
+                      senderAvatar: viewingNotifDetail.senderAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+                      initialMessage: viewingNotifDetail.text || 'হ্যালো! আপনার কাজের আপডেট সংক্রান্ত বিষয়ে কথা বলতে চাই।'
                     });
-                  } else if (viewingNotifDetail.category === 'seller') {
-                    setSpecialistMainTab('marketplace');
-                    setSellerSubTab('orders');
-                  } else if (viewingNotifDetail.category === 'mentor') {
-                    if (isMentor) {
-                      setSpecialistMainTab('mentor');
-                      setSellerSubTab('courses');
-                    } else if (isMentorPending) {
-                      setIsMentorStatusModalOpen(true);
-                    } else {
-                      setIsMentorAppModalOpen(true);
-                    }
-                  } else if (viewingNotifDetail.category === 'payout') {
-                    setSpecialistMainTab('payments');
-                    setPayoutSubTab('history');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
                   }
+
+                  // 2. Course / Classroom / Live Module
+                  if (
+                    targetTab === 'courses' ||
+                    targetTab === 'learning' ||
+                    viewingNotifDetail.category === 'mentor' ||
+                    notifTitle.includes('কোর্স') ||
+                    notifTitle.includes('মডিউল') ||
+                    notifText.includes('মডিউল')
+                  ) {
+                    if (onStartLearning) {
+                      onStartLearning('course-mern-pro', 'video', 'courses');
+                    } else if (setActiveTab) {
+                      setActiveTab('courses', undefined, true);
+                    } else {
+                      setViewMode('buying');
+                      setActiveSubTab('courses');
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
+
+                  // 3. Student Assignment & Grading
+                  if (
+                    targetTab === 'student-dashboard' ||
+                    notifTitle.includes('অ্যাসাইনমেন্ট') ||
+                    notifTitle.includes('assignment') ||
+                    notifTitle.includes('রিভিউ') ||
+                    notifText.includes('অ্যাসাইনমেন্ট')
+                  ) {
+                    if (setActiveTab) {
+                      setActiveTab('student-dashboard', 'my-courses', true);
+                    }
+                    setViewMode('buying');
+                    setActiveSubTab('my-courses');
+                    setOrderHubTab('courses');
+                    setStudentHubActiveTab('assignments');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
+
+                  // 4. Financials / Wallet / Payout
+                  if (
+                    targetTab === 'financials' ||
+                    viewingNotifDetail.category === 'payout' ||
+                    notifTitle.includes('ওয়ালেট') ||
+                    notifTitle.includes('পেমেন্ট') ||
+                    notifTitle.includes('বোনাস') ||
+                    notifTitle.includes('ক্যাশআউট') ||
+                    notifText.includes('ওয়ালেট') ||
+                    notifText.includes('ক্রেডিট')
+                  ) {
+                    if (viewMode === 'selling') {
+                      setSpecialistMainTab('payments');
+                      setPayoutSubTab('history');
+                    } else {
+                      setViewMode('buying');
+                      setActiveSubTab('my-orders');
+                      setOrderHubTab('orders');
+                    }
+                    if (setActiveTab) {
+                      setActiveTab('financials', undefined, true);
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
+
+                  // 5. Orders & Deliveries
+                  if (
+                    targetTab === 'marketplace' ||
+                    viewingNotifDetail.category === 'seller' ||
+                    notifTitle.includes('অর্ডার') ||
+                    notifTitle.includes('ord-') ||
+                    notifTitle.includes('এস্ক্রো') ||
+                    notifTitle.includes('গিগ')
+                  ) {
+                    setSelectedGig(null);
+                    if (viewMode === 'selling') {
+                      setSpecialistMainTab('marketplace');
+                      setSellerSubTab('orders');
+                    } else {
+                      setViewMode('buying');
+                      setActiveSubTab('my-orders');
+                      setOrderHubTab('orders');
+                    }
+                    if (setActiveTab) {
+                      setActiveTab('marketplace', 'my-orders', true);
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
+
+                  // 6. Generic Target Tab Fallback
+                  if (targetTab && setActiveTab) {
+                    setActiveTab(targetTab, undefined, true);
+                  } else if (setActiveTab) {
+                    setActiveTab('marketplace', 'All', true);
+                  }
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className="px-4 py-2 bg-[#1DB954] hover:bg-[#19a34a] text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-md transition cursor-pointer active:scale-95"
               >

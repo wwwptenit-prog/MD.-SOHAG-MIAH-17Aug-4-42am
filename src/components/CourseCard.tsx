@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, BookOpen, Users, Star, ArrowRight, Tag, CheckCircle2 } from 'lucide-react';
+import { Clock, BookOpen, Users, Star, ArrowRight, Tag, CheckCircle2, PlayCircle } from 'lucide-react';
 import { Course } from '../types';
 import { useData } from '../context/DataContext';
 
@@ -7,17 +7,23 @@ interface CourseCardProps {
   course: Course;
   onOpenDetail: (courseId: string) => void;
   onQuickEnroll: (course: Course) => void;
+  onStartLearning?: (courseId: string) => void;
 }
 
 export const CourseCard: React.FC<CourseCardProps> = ({
   course,
   onOpenDetail,
-  onQuickEnroll
+  onQuickEnroll,
+  onStartLearning
 }) => {
-  const { t } = useData();
+  const { t, currentUser, enrollments } = useData();
+
+  const isEnrolled = currentUser
+    ? enrollments.some(e => (e.userId === currentUser.id || (e as any).studentId === currentUser.id) && e.courseId === course.id)
+    : false;
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200/90 dark:border-slate-700/80 shadow-sm hover:shadow-2xl hover:border-[#1DB954] transition-all duration-300 flex flex-col overflow-hidden group">
+    <div className={`bg-white dark:bg-slate-800 rounded-3xl border ${isEnrolled ? 'border-[#1DB954] shadow-md dark:border-[#1DB954]/60' : 'border-slate-200/90 dark:border-slate-700/80 shadow-sm'} hover:shadow-2xl hover:border-[#1DB954] transition-all duration-300 flex flex-col overflow-hidden group`}>
       
       {/* Thumbnail & Badges */}
       <div className="relative aspect-video sm:aspect-video w-full overflow-hidden bg-slate-900">
@@ -28,9 +34,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
 
-        {/* Free / Paid Badge */}
-        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex items-center gap-1 sm:gap-2">
-          {course.isFree ? (
+        {/* Top Badges */}
+        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex items-center gap-1 sm:gap-2 flex-wrap">
+          {isEnrolled ? (
+            <span className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#1DB954] text-slate-950 font-black text-[9px] sm:text-xs shadow-md uppercase tracking-wider flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-slate-950" /> {t('এনরোল্ড', 'Enrolled')}
+            </span>
+          ) : course.isFree ? (
             <span className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-emerald-500 text-white font-bold text-[9px] sm:text-xs shadow-md uppercase tracking-wider flex items-center gap-0.5 sm:gap-1">
               <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> {t('সম্পূর্ণ ফ্রি', 'Fully Free')}
             </span>
@@ -60,7 +70,13 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         
         <div className="space-y-1">
           <h3
-            onClick={() => onOpenDetail(course.id)}
+            onClick={() => {
+              if (isEnrolled && onStartLearning) {
+                onStartLearning(course.id);
+              } else {
+                onOpenDetail(course.id);
+              }
+            }}
             className="text-xs sm:text-base font-bold font-heading text-slate-900 dark:text-white hover:text-[#1DB954] transition-colors cursor-pointer line-clamp-2 leading-snug min-h-[2rem] sm:min-h-[2.5rem]"
           >
             {course.title}
@@ -87,10 +103,15 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           </div>
         </div>
 
-        {/* Price & Actions: Single "বিস্তারিত" button */}
+        {/* Price & Actions */}
         <div className="flex items-center justify-between gap-1 sm:gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
           <div className="min-w-0">
-            {course.isFree ? (
+            {isEnrolled ? (
+              <span className="text-[11px] sm:text-xs font-black text-[#1DB954] flex items-center gap-1 truncate">
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#1DB954] shrink-0" />
+                <span>অ্যাক্টিভ কোর্স</span>
+              </span>
+            ) : course.isFree ? (
               <span className="text-[11px] sm:text-base font-black text-emerald-500 dark:text-emerald-400 block truncate leading-tight">
                 {t('সম্পূর্ণ ফ্রি', 'Fully Free')}
               </span>
@@ -108,14 +129,33 @@ export const CourseCard: React.FC<CourseCardProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => onOpenDetail(course.id)}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold text-white bg-[#1DB954] hover:bg-emerald-600 shadow-xs sm:shadow-md sm:shadow-[#1DB954]/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shrink-0"
-          >
-            <span>{t('বিস্তারিত', 'Details')}</span>
-            <ArrowRight className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isEnrolled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onStartLearning) {
+                    onStartLearning(course.id);
+                  } else {
+                    onOpenDetail(course.id);
+                  }
+                }}
+                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black text-slate-950 bg-[#1DB954] hover:bg-[#19a34a] shadow-xs sm:shadow-md sm:shadow-[#1DB954]/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shrink-0"
+              >
+                <PlayCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span>{t('ক্লাসে যান →', 'Go to Class →')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenDetail(course.id)}
+                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold text-white bg-[#1DB954] hover:bg-emerald-600 shadow-xs sm:shadow-md sm:shadow-[#1DB954]/20 transition-all cursor-pointer flex items-center gap-1 active:scale-95 shrink-0"
+              >
+                <span>{t('বিস্তারিত', 'Details')}</span>
+                <ArrowRight className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
       </div>

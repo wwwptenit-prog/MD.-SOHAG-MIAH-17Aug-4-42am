@@ -67,7 +67,11 @@ interface ConversationItem {
   category?: string;
 }
 
-export const FloatingMessengerWindows: React.FC = () => {
+interface FloatingMessengerWindowsProps {
+  onNavigateTab?: (tab: string, category?: string, pushHistory?: boolean) => void;
+}
+
+export const FloatingMessengerWindows: React.FC<FloatingMessengerWindowsProps> = ({ onNavigateTab }) => {
   const {
     activeChatWindows,
     closeChatWindow,
@@ -459,22 +463,7 @@ export const FloatingMessengerWindows: React.FC = () => {
               >
                 <ShoppingBag className="w-5 h-5 text-white" />
               </button>
-              {/* 3. Course */}
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTopTab('courses');
-                  setSelectedConversationId(null);
-                  setSelectedNotification(null);
-                }}
-                className={`flex-1 flex justify-center items-center py-1 transition relative active:scale-95 cursor-pointer ${
-                  activeTopTab === 'courses' ? 'text-[#1DB954]' : 'text-white hover:text-emerald-400'
-                }`}
-                title="আমার কোর্সসমূহ ও ফিচারস"
-              >
-                <BookOpen className={`w-5 h-5 ${activeTopTab === 'courses' ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
-              </button>
-              {/* 4. Messenger */}
+              {/* 3. Messenger */}
               <button
                 type="button"
                 onClick={() => {
@@ -488,7 +477,7 @@ export const FloatingMessengerWindows: React.FC = () => {
               >
                 <Mail className={`w-5 h-5 ${activeTopTab === 'messages' ? 'stroke-[2.5] text-[#1DB954]' : 'text-white'}`} />
               </button>
-              {/* 5. Notification */}
+              {/* 4. Notification */}
               <button
                 type="button"
                 onClick={() => {
@@ -505,7 +494,7 @@ export const FloatingMessengerWindows: React.FC = () => {
                   <span className="absolute top-0 right-2 w-2 h-2 rounded-full bg-[#1DB954] ring-2 ring-[#0B132B]" />
                 )}
               </button>
-              {/* 6. Saved / Favorites */}
+              {/* 5. Saved / Favorites */}
               <button
                 type="button"
                 onClick={handleCloseAll}
@@ -1276,8 +1265,38 @@ export const FloatingMessengerWindows: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => {
+                                const notifTitle = (selectedNotification.title || '').toLowerCase();
+                                const notifMsg = (selectedNotification.message || '').toLowerCase();
+                                const targetTab = selectedNotification.targetTab;
+
                                 setSelectedNotification(null);
                                 handleCloseAll();
+
+                                if (targetTab === 'courses' || notifTitle.includes('কোর্স') || notifTitle.includes('মডিউল') || notifMsg.includes('মডিউল')) {
+                                  if (onNavigateTab) onNavigateTab('courses', undefined, true);
+                                  return;
+                                }
+
+                                if (targetTab === 'student-dashboard' || notifTitle.includes('অ্যাসাইনমেন্ট') || notifTitle.includes('assignment') || notifMsg.includes('অ্যাসাইনমেন্ট')) {
+                                  if (onNavigateTab) onNavigateTab('student-dashboard', 'my-courses', true);
+                                  return;
+                                }
+
+                                if (targetTab === 'financials' || selectedNotification.category === 'payout' || notifTitle.includes('ওয়ালেট') || notifTitle.includes('পেমেন্ট') || notifTitle.includes('বোনাস') || notifTitle.includes('ক্যাশআউট')) {
+                                  if (onNavigateTab) onNavigateTab('financials', undefined, true);
+                                  return;
+                                }
+
+                                if (targetTab === 'marketplace' || notifTitle.includes('অর্ডার') || notifTitle.includes('ord-') || notifTitle.includes('এস্ক্রো') || notifTitle.includes('গিগ')) {
+                                  if (onNavigateTab) onNavigateTab('marketplace', 'my-orders', true);
+                                  return;
+                                }
+
+                                if (targetTab && onNavigateTab) {
+                                  onNavigateTab(targetTab, undefined, true);
+                                } else if (onNavigateTab) {
+                                  onNavigateTab('marketplace', 'All', true);
+                                }
                               }}
                               className="flex-1 py-2.5 bg-[#0084FF] hover:bg-blue-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 transition shadow-xs cursor-pointer active:scale-95"
                             >

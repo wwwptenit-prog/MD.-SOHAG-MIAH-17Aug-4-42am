@@ -948,11 +948,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                           {/* Visual Progress Bar & Lessons Stats */}
                           <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-2">
                             <div className="flex justify-between items-center text-xs font-bold">
-                              <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                📊 ক্লাস অগ্রগতি: <span className="text-slate-900 dark:text-white font-mono">{enr.progress}%</span>
+                              <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                                <BookOpen className="w-3.5 h-3.5 text-[#1DB954]" />
+                                <span>অগ্রগতি</span>
                               </span>
-                              <span className="text-[#1DB954] font-mono text-[11px]">
-                                ১২/১৬ লেসন সম্পন্ন
+                              <span className="text-[#1DB954] font-black text-xs">
+                                {enr.progress}% সম্পন্ন
                               </span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
@@ -966,14 +967,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
                         {/* PC Feature Action Suite Grid */}
                         <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-                          {/* Main Primary Button */}
-                          <button
-                            onClick={() => onStartLearning(course.id)}
-                            className="w-full py-2.5 bg-[#1DB954] hover:bg-emerald-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
-                          >
-                            <PlayCircle className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-                            <span>ভিডিও প্লেয়ার ও লার্নিং ড্যাশবোর্ডে যান</span>
-                          </button>
+                          {/* Main Action Buttons */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onStartLearning(course.id)}
+                              className="flex-1 py-2.5 px-3 bg-[#1DB954] hover:bg-emerald-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                            >
+                              <PlayCircle className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                              <span>ক্লাসে যান</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveCurriculumModal(course)}
+                              className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 transition cursor-pointer active:scale-98"
+                            >
+                              <span>বিস্তারিত</span>
+                            </button>
+                          </div>
 
                           {/* Desktop Interactive Tools Suite */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px] font-bold">

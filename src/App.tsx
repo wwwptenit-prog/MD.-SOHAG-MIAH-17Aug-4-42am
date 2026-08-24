@@ -54,31 +54,50 @@ const MainAppContent: React.FC = () => {
 
     if (pushHistory) {
       setNavHistory(prev => [
-        ...prev.slice(-15), // keep last 15 history steps
+        ...prev.slice(-20), // keep last 20 history steps
         { tab: activeTab, category: marketplaceCategory, courseId: learningCourseId }
       ]);
+      try {
+        window.history.pushState({ tab, category: category || 'All' }, '');
+      } catch (e) {
+        // ignore history errors
+      }
     }
 
-    if (tab === 'marketplace') {
-      setMarketplaceCategory(category || 'All');
+    if (category) {
+      setMarketplaceCategory(category);
+    } else if (tab === 'student-dashboard') {
+      setMarketplaceCategory('my-courses');
+    } else if (tab === 'teacher-dashboard') {
+      setMarketplaceCategory('selling');
+    } else if (tab === 'customer-dashboard') {
+      setMarketplaceCategory('buying');
+    } else if (tab === 'marketplace') {
+      setMarketplaceCategory('All');
     }
     setActiveTab(tab);
   };
 
   const handleStartLearning = (
     courseId: string,
-    tabMode: 'video' | 'live' | 'assignment' | 'quiz' | 'resources' | 'certificate' | 'notes' | 'ai-tutor' = 'video'
+    tabMode: 'video' | 'live' | 'assignment' | 'quiz' | 'resources' | 'certificate' | 'notes' | 'ai-tutor' = 'video',
+    originCategoryOverride?: string
   ) => {
-    // Record exactly where the student came from
-    const originTab = activeTab !== 'learning' ? activeTab : 'student-dashboard';
+    // Record origin navigation state. By default learning initiates from Student Hub / My Courses
+    const originTab = activeTab !== 'learning' ? activeTab : (currentUser ? 'student-dashboard' : 'marketplace');
+    const originCategory = originCategoryOverride || (originTab === 'courses' ? 'courses' : (marketplaceCategory || 'my-courses'));
+
     setPreviousNavState({
       tab: originTab,
-      category: marketplaceCategory
+      category: originCategory
     });
     setNavHistory(prev => [
-      ...prev.slice(-15),
-      { tab: originTab, category: marketplaceCategory }
+      ...prev.slice(-20),
+      { tab: originTab, category: originCategory }
     ]);
+    try {
+      window.history.pushState({ tab: 'learning', courseId }, '');
+    } catch (e) {}
     setLearningInitialTab(tabMode);
     setLearningCourseId(courseId);
     setActiveTab('learning');
@@ -98,24 +117,20 @@ const MainAppContent: React.FC = () => {
       return;
     }
 
-    // 3. If in Classroom / Learning mode, return to origin page
+    // 3. If in Classroom / Learning mode, return directly to Student Hub / My Courses where (নতুন কোর্স ব্রাউজ →) is located
     if (activeTab === 'learning' || learningCourseId) {
       setLearningCourseId(null);
-      if (previousNavState && previousNavState.tab && previousNavState.tab !== 'learning') {
-        if (previousNavState.category) {
-          setMarketplaceCategory(previousNavState.category);
-        }
-        setActiveTab(previousNavState.tab);
-        return;
-      }
-      if (navHistory.length > 0) {
-        const last = navHistory[navHistory.length - 1];
-        setNavHistory(prev => prev.slice(0, -1));
-        if (last.category) setMarketplaceCategory(last.category);
-        setActiveTab(last.tab || (currentUser ? 'student-dashboard' : 'home'));
-        return;
-      }
-      setActiveTab(currentUser ? 'student-dashboard' : 'home');
+      const targetTab = (previousNavState && previousNavState.tab !== 'learning' && previousNavState.tab)
+        ? previousNavState.tab
+        : (currentUser ? 'student-dashboard' : 'marketplace');
+      
+      const targetCategory = (previousNavState && previousNavState.category)
+        ? previousNavState.category
+        : (targetTab === 'courses' ? 'courses' : 'my-courses');
+
+      setMarketplaceCategory(targetCategory);
+      setActiveTab(targetTab);
+      setPreviousNavState(null);
       return;
     }
 
@@ -264,6 +279,7 @@ const MainAppContent: React.FC = () => {
             <CoursesSection
               onOpenDetail={(id) => setSelectedCourseId(id)}
               onQuickEnroll={handleQuickEnroll}
+              onStartLearning={handleStartLearning}
               setActiveTab={handleSetActiveTab}
               isStandalonePage={false}
             />
@@ -279,7 +295,9 @@ const MainAppContent: React.FC = () => {
           <CoursesSection
             onOpenDetail={(id) => setSelectedCourseId(id)}
             onQuickEnroll={handleQuickEnroll}
+            onStartLearning={handleStartLearning}
             setActiveTab={handleSetActiveTab}
+            onBack={handleGoBack}
             isStandalonePage={true}
           />
         )}
@@ -297,6 +315,7 @@ const MainAppContent: React.FC = () => {
             openAuthModal={() => setAuthModalOpen(true)}
             initialCategory={marketplaceCategory}
             onStartLearning={handleStartLearning}
+            onOpenDetail={(id) => setSelectedCourseId(id)}
           />
         )}
 
@@ -324,7 +343,7 @@ const MainAppContent: React.FC = () => {
             setActiveTab={handleSetActiveTab}
             activeTab={activeTab}
             openAuthModal={() => setAuthModalOpen(true)}
-            initialCategory="selling"
+            initialCategory={marketplaceCategory || "selling"}
             onStartLearning={handleStartLearning}
           />
         )}
@@ -334,7 +353,7 @@ const MainAppContent: React.FC = () => {
             setActiveTab={handleSetActiveTab}
             activeTab={activeTab}
             openAuthModal={() => setAuthModalOpen(true)}
-            initialCategory="buying"
+            initialCategory={marketplaceCategory || "buying"}
             onStartLearning={handleStartLearning}
           />
         )}
@@ -344,7 +363,7 @@ const MainAppContent: React.FC = () => {
             setActiveTab={handleSetActiveTab}
             activeTab={activeTab}
             openAuthModal={() => setAuthModalOpen(true)}
-            initialCategory="buying"
+            initialCategory={marketplaceCategory || "my-courses"}
             onStartLearning={handleStartLearning}
           />
         )}
@@ -358,7 +377,7 @@ const MainAppContent: React.FC = () => {
                 setActiveTab={handleSetActiveTab}
                 activeTab={activeTab}
                 openAuthModal={() => setAuthModalOpen(true)}
-                initialCategory="selling"
+                initialCategory={marketplaceCategory || "selling"}
                 onStartLearning={handleStartLearning}
               />
             ) : (
@@ -366,7 +385,7 @@ const MainAppContent: React.FC = () => {
                 setActiveTab={handleSetActiveTab}
                 activeTab={activeTab}
                 openAuthModal={() => setAuthModalOpen(true)}
-                initialCategory="buying"
+                initialCategory={marketplaceCategory || "my-courses"}
                 onStartLearning={handleStartLearning}
               />
             )}
@@ -412,7 +431,7 @@ const MainAppContent: React.FC = () => {
       />
 
       {/* Facebook-style Messenger Floating Chat Windows */}
-      <FloatingMessengerWindows />
+      <FloatingMessengerWindows onNavigateTab={handleSetActiveTab} />
 
       {/* Central Mobile & Desktop Notification Center Modal */}
       <NotificationCenterModal onNavigateTab={setActiveTab} />
